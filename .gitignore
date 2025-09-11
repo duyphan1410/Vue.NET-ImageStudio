@@ -4,4 +4,77 @@ BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-/BackendApi/obj/Debug/net8.0
+/BackendApi/obj
+/BackendApi/bin
+# --------------------------
+# Node / Vue.js
+# --------------------------
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.local
+
+# Vue build output
+*.cache
+*.temp
+.cache/
+.temp/
+
+# --------------------------
+# .NET
+# --------------------------
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.vs/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# --------------------------
+# Python
+# --------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.egg
+*.manifest
+*.spec
+*.log
+*.tmp
+.env
+venv/
+ENV/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --------------------------
+# Visual Studio Code
+# --------------------------
+.vscode/
+.history/
+*.code-workspace
+
+# --------------------------
+# OS files
+# --------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
