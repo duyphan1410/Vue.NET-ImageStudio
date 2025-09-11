@@ -72,53 +72,49 @@ const switchTab = (tab) => {
 const imageStyle = computed(() => ({
   filter: `brightness(${brightness.value}%) contrast(${contrast.value}%) saturate(${saturation.value}%)`
 }));
-let adjustmentTimeout;
-const applyAdjustments = () => {
-  if (adjustmentTimeout) clearTimeout(adjustmentTimeout);
+
+
+// const applyAdjustments = () => {
+//   if (adjustmentTimeout) clearTimeout(adjustmentTimeout);
   
-  adjustmentTimeout = setTimeout(async () => {
-    if (!editedImage.value) return;
+//   adjustmentTimeout = setTimeout(async () => {
+//     if (!editedImage.value) return;
     
-    try {
-      isLoading.value = true;
-      const adjustments = {
-        brightness: brightness.value,
-        contrast: contrast.value,
-        saturation: saturation.value
-      };
+//     try {
+//       isLoading.value = true;
+//       const adjustments = {
+//         brightness: brightness.value,
+//         contrast: contrast.value,
+//         saturation: saturation.value
+//       };
 
-      const response = await api.post('api/image/adjust', {
-        image: editedImage.value,
-        adjustments
-      });
+//       const response = await api.post('api/image/adjust', {
+//         image: editedImage.value,
+//         adjustments
+//       });
 
-      editedImage.value = response.data.image;
-    } catch (err) {
-      error.value = "Failed to apply adjustments";
-    } finally {
-      isLoading.value = false;
-    }
-  }, 500); // Wait 500ms after last change before sending to API
+//       editedImage.value = response.data.image;
+//     } catch (err) {
+//       error.value = "Failed to apply adjustments";
+//     } finally {
+//       isLoading.value = false;
+//     }
+//   }, 500); // Wait 500ms after last change before sending to API
+// };
+const filters = {
+  bright: "brightness(120%)",
+  dark: "brightness(70%)",
+  vivid: "saturate(150%)",
+  bw: "grayscale(100%)"
 };
 
-// Filter applications
-const applyFilter = async (filterType) => {
+const currentFilter = ref(""); 
+const applyFilter = (filterType) => {
   if (!editedImage.value) return;
-
-  try {
-    isLoading.value = true;
-    const response = await api.post('api/image/filter', {
-      image: editedImage.value,
-      filter: filterType
-    });
-
-    editedImage.value = response.data.image;
-  } catch (err) {
-    error.value = "Failed to apply filter";
-  } finally {
-    isLoading.value = false;
-  }
+  // áp dụng filter ngay lập tức bằng CSS
+  currentFilter.value = filters[filterType] || "";
 };
+
 
 // Reset image
 const resetToOriginal = () => {
@@ -127,6 +123,7 @@ const resetToOriginal = () => {
     brightness.value = 100;
     contrast.value = 100;
     saturation.value = 100;
+    currentFilter.value = "";
   }
 };
 
@@ -233,13 +230,14 @@ const downloadImage = () => {
           </div>
         </div>
 
-        <!-- Filters Tab Content -->
         <div v-if="activeTab === 'Filters'" class="filter-controls">
-          <button class="filter-btn" @click="applyFilter('bright')">Bright</button>
-          <button class="filter-btn" @click="applyFilter('dark')">Dark</button>
-          <button class="filter-btn" @click="applyFilter('vivid')">Vivid</button>
-          <button class="filter-btn" @click="applyFilter('bw')">B&W</button>
+        <button class="filter-btn" @click="applyFilter('bright')">Bright</button>
+        <button class="filter-btn" @click="applyFilter('dark')">Dark</button>
+        <button class="filter-btn" @click="applyFilter('vivid')">Vivid</button>
+        <button class="filter-btn" @click="applyFilter('bw')">B&W</button>
         </div>
+
+
 
         <!-- Draw Tab Content -->
         <div v-if="activeTab === 'Draw'" class="drawing-controls">
@@ -314,10 +312,10 @@ const downloadImage = () => {
         <img 
           v-else 
           :src="editedImage" 
-          :style="imageStyle"
+          :style="[{ filter: currentFilter || `${imageStyle.filter}` }]"
           alt="Editing preview"
           class="preview-image"
-        />
+        />  
       </div>
     </div>
 
@@ -686,5 +684,32 @@ const downloadImage = () => {
   .tab-btn {
     padding: 0.5rem 1rem;
   }
+  .filter-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 0.5rem;
+}
+
+.filter-preview {
+  text-align: center;
+  cursor: pointer;
+  font-size: 0.75rem; /* chữ nhỏ gọn */
+}
+
+.preview-box {
+  width: 50px;
+  height: 50px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin: 0 auto 0.25rem;
+}
+
+.preview-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 }
 </style>
