@@ -1,17 +1,18 @@
 <template>
-
+  <div id="app-root">
     <nav class="navbar">
       <div class="nav-container">
         <router-link to="/">Trang chủ</router-link>
         <router-link to="/Hello">Hello</router-link>
         <router-link to="/remove-bg">RemoveBG</router-link>
         <router-link to="/paint-image">Paint Image</router-link>
+        <router-link to="/adjust-image">Adjust Image</router-link>
       </div>
     </nav>
     <main class="main-content">
       <router-view></router-view>
     </main>
-
+  </div>
 </template>
 
 <style>
@@ -22,20 +23,21 @@
   padding: 0;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   background-color: white !important;
   color: black !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   width: 100%;
   overflow-x: hidden;
 }
 
 #app {
-  width: 100vw;                    /* ← Dùng viewport width */
+  width: 100vw; /* ← Dùng viewport width */
   height: 100vh;
   background-color: white !important;
   color: black !important;
@@ -43,7 +45,17 @@ html, body {
 }
 
 /* Đảm bảo các element không bị dark mode */
-div, p, h1, h2, h3, h4, h5, h6, span, button, input {
+div,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+span,
+button,
+input {
   color: inherit;
 }
 
@@ -55,7 +67,7 @@ div, p, h1, h2, h3, h4, h5, h6, span, button, input {
   height: 60px;
   z-index: 1000;
   background-color: #f0f0f0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
 }
@@ -105,12 +117,12 @@ div, p, h1, h2, h3, h4, h5, h6, span, button, input {
     padding: 0 15px;
     gap: 15px;
   }
-  
+
   .navbar a {
     padding: 8px 12px;
     font-size: 14px;
   }
-  
+
   .main-content {
     padding-left: 15px;
     padding-right: 15px;
@@ -121,7 +133,7 @@ div, p, h1, h2, h3, h4, h5, h6, span, button, input {
   .nav-container {
     gap: 10px;
   }
-  
+
   .navbar a {
     padding: 6px 10px;
     font-size: 13px;

@@ -31,3 +31,37 @@ C:\Users\Admin\Desktop\V.N ImageStudio\BackendApi\obj\Debug\net8.0\refint\Backen
 C:\Users\Admin\Desktop\V.N ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.pdb
 C:\Users\Admin\Desktop\V.N ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.genruntimeconfig.cache
 C:\Users\Admin\Desktop\V.N ImageStudio\BackendApi\obj\Debug\net8.0\ref\BackendApi.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\appsettings.Development.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\appsettings.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\BackendApi.exe
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\BackendApi.deps.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\BackendApi.runtimeconfig.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\BackendApi.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\BackendApi.pdb
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\Microsoft.AspNetCore.OpenApi.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\Microsoft.OpenApi.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.csproj.AssemblyReference.cache
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.GeneratedMSBuildEditorConfig.editorconfig
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.AssemblyInfoInputs.cache
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.AssemblyInfo.cs
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.csproj.CoreCompileInputs.cache
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.MvcApplicationPartsAssemblyInfo.cs
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.MvcApplicationPartsAssemblyInfo.cache
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.sourcelink.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets.build.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets.development.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets\msbuild.BackendApi.Microsoft.AspNetCore.StaticWebAssets.props
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets\msbuild.build.BackendApi.props
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets\msbuild.buildMultiTargeting.BackendApi.props
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets\msbuild.buildTransitive.BackendApi.props
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\staticwebassets.pack.json
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\scopedcss\bundle\BackendApi.styles.css
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.csproj.Up2Date
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\refint\BackendApi.dll
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.pdb
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\BackendApi.genruntimeconfig.cache
+D:\VueJsProject\Vue.NET-ImageStudio\BackendApi\obj\Debug\net8.0\ref\BackendApi.dll

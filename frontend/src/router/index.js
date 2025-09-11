@@ -1,8 +1,9 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import RemoveBgView from '@/components/RemoveBgView.vue';
-import PaintImage from '@/views/PaintImage.vue';
-import HelloWorld from '@/components/HelloWorld.vue';
-import HomeView from '@/views/HomeView.vue';
+import { createRouter, createWebHistory } from 'vue-router'
+import RemoveBgView from '@/components/RemoveBgView.vue'
+import PaintImage from '@/views/PaintImage.vue'
+import HelloWorld from '@/components/HelloWorld.vue'
+import HomeView from '@/views/HomeView.vue'
+import AdjustImage from '@/components/AdjustImage.vue'
 
 const routes = [
   {
@@ -22,14 +23,15 @@ const routes = [
   },
   {
     path: '/paint-image',
-    name: 'PaingtImage',
+    name: 'PaintImage',
     component: PaintImage,
   },
-];
+  { path: '/adjust-image', name: 'AdjustImage', component: AdjustImage },
+]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
-});
+})
 
-export default router;
+export default router
