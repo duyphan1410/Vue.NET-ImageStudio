@@ -4,3 +4,20 @@ BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
+# Build folders
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+
+# User-specific files
+*.user
+*.suo
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
+*.temp
