@@ -117,6 +117,7 @@ const applyFilter = (filterType) => {
 
 let adjustmentTimeout = null;
 
+
 // Reset image
 const resetToOriginal = () => {
   if (originalImage.value) {
