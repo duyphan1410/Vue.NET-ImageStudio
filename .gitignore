@@ -4,8 +4,8 @@ BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
 BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-/BackendApi/obj
-/BackendApi/bin
+/BackendApi/obj/
+/BackendApi/bin/
 # --------------------------
 # Node / Vue.js
 # --------------------------
@@ -78,3 +78,5 @@ Thumbs.db
 ehthumbs.db
 Icon?
 desktop.ini
+package-lock.json
+runWeb.bat

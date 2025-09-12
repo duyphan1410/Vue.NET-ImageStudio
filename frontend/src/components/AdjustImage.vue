@@ -16,6 +16,9 @@ const uploadRef = ref(null);
 const brightness = ref(100);
 const contrast = ref(100);
 const saturation = ref(100);
+const rotateAngle = ref(0);
+const flipX = ref(false);
+const flipY = ref(false);
 
 // Drawing tools
 const selectedTool = ref('brush');
@@ -70,7 +73,9 @@ const switchTab = (tab) => {
   activeTab.value = tab;
 };
 const imageStyle = computed(() => ({
-  filter: `brightness(${brightness.value}%) contrast(${contrast.value}%) saturate(${saturation.value}%)`
+  filter: `brightness(${brightness.value}%) contrast(${contrast.value}%) saturate(${saturation.value}%)`,
+  transform: `rotate(${rotateAngle.value}deg) scaleX(${flipX.value ? -1 : 1}) scaleY(${flipY.value ? -1 : 1})`,
+ 
 }));
 
 
@@ -129,14 +134,16 @@ const resetToOriginal = () => {
   }
 };
 
-// Transform operations
-const rotateImage = () => {
-  // Implement rotation logic
-};
-
 const flipImage = (axis) => {
-  // Implement flip logic
-};
+  // Implement flip logic\
+  if (axis === 'x') flipX.value = !flipX.value;
+  if (axis === 'y') flipY.value = !flipY.value;
+
+  // Apply flip immediately using CSS
+  imageStyle.value.transform = `rotate(${rotateAngle.value}deg) scaleX(${flipX.value ? -1 : 1}) scaleY(${flipY.value ? -1 : 1})`;
+  
+  
+};  
 
 // Download function
 const downloadImage = () => {
@@ -279,7 +286,17 @@ const downloadImage = () => {
           <button class="reset-btn" @click="resetToOriginal">Reset to Original</button>
           
           <div class="transform-controls">
-            <button class="transform-btn" @click="rotateImage">Rotate</button>
+            <!-- slider for rotate -->
+            <div class="rotate-slider">
+              <label>Rotate</label>
+              <input 
+                type="range" 
+                v-model="rotateAngle" 
+                min="0" 
+                max="360"
+              />
+              <span>{{ rotateAngle }}°</span>
+            </div>
             <button class="transform-btn" @click="() => flipImage('x')">Flip X</button>
             <button class="transform-btn" @click="() => flipImage('y')">Flip Y</button>
           </div>
@@ -314,7 +331,7 @@ const downloadImage = () => {
         <img 
           v-else 
           :src="editedImage" 
-          :style="[{ filter: currentFilter || `${imageStyle.filter}` }]"
+          :style="[{ filter: currentFilter || `${imageStyle.filter}` },{transform: imageStyle.transform}]"
           alt="Editing preview"
           class="preview-image"
         />  
