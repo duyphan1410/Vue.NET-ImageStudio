@@ -17,15 +17,11 @@ yarn-error.log*
 pnpm-debug.log*
 *.local
 
-# Vue build output
 *.cache
 *.temp
 .cache/
 .temp/
 
-# --------------------------
-# .NET
-# --------------------------
 bin/
 obj/
 *.user
