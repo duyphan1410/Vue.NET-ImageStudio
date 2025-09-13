@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import api from "../services/api";
 
 // State management
@@ -11,6 +11,17 @@ const isLoading = ref(false);
 const error = ref(null);
 const isDragging = ref(false);
 const uploadRef = ref(null);
+
+// Canvas refs and drawing state
+const canvasRef = ref(null);
+const canvasContext = ref(null);
+const isDrawing = ref(false);
+const lastX = ref(0);
+const lastY = ref(0);
+const startX = ref(0);
+const startY = ref(0);
+const tempCanvas = ref(null);  // For temporary drawing of shapes
+const brushType = ref('round'); // 'round' or 'square'
 
 // Adjustment values
 const brightness = ref(100);
@@ -78,34 +89,6 @@ const imageStyle = computed(() => ({
  
 }));
 
-
-// const applyAdjustments = () => {
-//   if (adjustmentTimeout) clearTimeout(adjustmentTimeout);
-  
-//   adjustmentTimeout = setTimeout(async () => {
-//     if (!editedImage.value) return;
-    
-//     try {
-//       isLoading.value = true;
-//       const adjustments = {
-//         brightness: brightness.value,
-//         contrast: contrast.value,
-//         saturation: saturation.value
-//       };
-
-//       const response = await api.post('api/image/adjust', {
-//         image: editedImage.value,
-//         adjustments
-//       });
-
-//       editedImage.value = response.data.image;
-//     } catch (err) {
-//       error.value = "Failed to apply adjustments";
-//     } finally {
-//       isLoading.value = false;
-//     }
-//   }, 500); // Wait 500ms after last change before sending to API
-// };
 const filters = {
   bright: "brightness(120%)",
   dark: "brightness(70%)",
@@ -141,19 +124,237 @@ const flipImage = (axis) => {
 
   // Apply flip immediately using CSS
   imageStyle.value.transform = `rotate(${rotateAngle.value}deg) scaleX(${flipX.value ? -1 : 1}) scaleY(${flipY.value ? -1 : 1})`;
-  
+
   
 };  
+// Drawing functions
+const initCanvas = () => {
+  if (!canvasRef.value || !editedImage.value) return;
 
-// Download function
-const downloadImage = () => {
-  if (editedImage.value) {
-    const link = document.createElement('a');
-    link.download = `edited-image-${Date.now()}.png`;
-    link.href = editedImage.value;
-    link.click();
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = editedImage.value;
+  
+  img.onload = () => {
+    // Get the container dimensions
+    const container = canvasRef.value.parentElement;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    
+    // Calculate scale to fit image within container while maintaining aspect ratio
+    const scale = Math.min(
+      containerWidth / img.width,
+      containerHeight / img.height
+    );
+    
+    // Set canvas dimensions to match scaled image
+    canvasRef.value.width = img.width;
+    canvasRef.value.height = img.height;
+    
+    // Set display size
+    canvasRef.value.style.width = `${img.width * scale}px`;
+    canvasRef.value.style.height = `${img.height * scale}px`;
+    
+    // Get and setup context
+    canvasContext.value = canvasRef.value.getContext('2d');
+    
+    // *** FIX: Tạo canvas trong suốt thay vì vẽ image trực tiếp ***
+    // Clear canvas to transparent
+    canvasContext.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+    // Draw image with transparency support
+    canvasContext.value.drawImage(img, 0, 0);
+  };
+};
+
+const getCanvasCoordinates = (e) => {
+  const rect = canvasRef.value.getBoundingClientRect();
+  const scaleX = canvasRef.value.width / rect.width;
+  const scaleY = canvasRef.value.height / rect.height;
+  
+  // Handle both mouse and touch events
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+};
+
+const initTempCanvas = () => {
+  tempCanvas.value = document.createElement('canvas');
+  tempCanvas.value.width = canvasRef.value.width;
+  tempCanvas.value.height = canvasRef.value.height;
+  const tempCtx = tempCanvas.value.getContext('2d');
+  tempCtx.drawImage(canvasRef.value, 0, 0);
+};
+
+// Cập nhật startDrawing để xử lý eraser
+const startDrawing = (e) => {
+  if (!canvasContext.value) return;
+  
+  isDrawing.value = true;
+  const coords = getCanvasCoordinates(e);
+  lastX.value = coords.x;
+  lastY.value = coords.y;
+  startX.value = coords.x;
+  startY.value = coords.y;
+
+  if (selectedTool.value === 'rectangle') {
+    initTempCanvas();
+  }
+
+  // Reset globalCompositeOperation to default for brush
+  if (selectedTool.value === 'brush') {
+    canvasContext.value.globalCompositeOperation = 'source-over';
+    
+    // Vẽ điểm đầu tiên
+    const size = brushSize.value;
+    canvasContext.value.beginPath();
+    canvasContext.value.arc(coords.x, coords.y, size/2, 0, Math.PI * 2);
+    canvasContext.value.fillStyle = brushColor.value;
+    canvasContext.value.fill();
+  } else if (selectedTool.value === 'eraser') {
+    // Xóa điểm đầu tiên
+    const size = brushSize.value;
+    canvasContext.value.save();
+    canvasContext.value.globalCompositeOperation = 'destination-out';
+    canvasContext.value.beginPath();
+    canvasContext.value.arc(coords.x, coords.y, size/2, 0, Math.PI * 2);
+    canvasContext.value.fill();
+    canvasContext.value.restore();
   }
 };
+
+// Thay thế phần draw function với logic eraser được fix
+const draw = (e) => {
+  if (!isDrawing.value || !canvasContext.value) return;
+
+  const coords = getCanvasCoordinates(e);
+  const currentX = coords.x;
+  const currentY = coords.y;
+
+  if (selectedTool.value === 'brush') {
+    const size = brushSize.value;
+    
+    canvasContext.value.beginPath();
+    canvasContext.value.moveTo(lastX.value, lastY.value);
+    canvasContext.value.lineTo(currentX, currentY);
+    canvasContext.value.strokeStyle = brushColor.value;
+    canvasContext.value.lineWidth = size;
+    canvasContext.value.lineCap = brushType.value;
+    canvasContext.value.lineJoin = brushType.value;
+    canvasContext.value.stroke();
+  } else if (selectedTool.value === 'eraser') {
+    // *** FIX: Cách xóa đúng để tạo vùng trong suốt ***
+    const size = brushSize.value;
+    
+    canvasContext.value.save();
+    canvasContext.value.globalCompositeOperation = 'destination-out';
+    canvasContext.value.beginPath();
+    canvasContext.value.arc(currentX, currentY, size / 2, 0, Math.PI * 2);
+    canvasContext.value.fill();
+    
+    // Nếu muốn xóa theo đường thẳng như brush
+    if (lastX.value !== currentX || lastY.value !== currentY) {
+      canvasContext.value.beginPath();
+      canvasContext.value.moveTo(lastX.value, lastY.value);
+      canvasContext.value.lineTo(currentX, currentY);
+      canvasContext.value.lineWidth = size;
+      canvasContext.value.lineCap = 'round';
+      canvasContext.value.lineJoin = 'round';
+      canvasContext.value.stroke();
+    }
+    
+    canvasContext.value.restore();
+  } else if (selectedTool.value === 'rectangle') {
+    const size = brushSize.value;
+    
+    canvasContext.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+    canvasContext.value.drawImage(tempCanvas.value, 0, 0);
+    
+    canvasContext.value.beginPath();
+    canvasContext.value.moveTo(lastX.value, lastY.value);
+    canvasContext.value.lineTo(currentX, currentY);
+    canvasContext.value.strokeStyle = brushColor.value;
+    canvasContext.value.lineWidth = size;
+    canvasContext.value.lineCap = brushType.value;
+    canvasContext.value.lineJoin = brushType.value;
+    canvasContext.value.stroke();
+  }
+
+  lastX.value = currentX;
+  lastY.value = currentY;
+};
+
+const stopDrawing = () => {
+  if (isDrawing.value) {
+    isDrawing.value = false;
+    // Update editedImage with the drawn canvas
+    editedImage.value = canvasRef.value.toDataURL('image/png');
+  }
+};
+
+// Watch for tab changes and image changes
+const initializeCanvasIfNeeded = () => {
+  if (activeTab.value === 'Draw' && editedImage.value) {
+    // Wait for the next tick to ensure canvas is mounted
+    nextTick(() => {
+      initCanvas();
+    });
+  }
+};
+
+watch(() => activeTab.value, (newTab) => {
+  if (newTab === 'Draw') {
+    initializeCanvasIfNeeded();
+  }
+});
+
+watch(() => editedImage.value, (newImage) => {
+  if (activeTab.value === 'Draw' && newImage) {
+    initializeCanvasIfNeeded();
+  }
+});
+
+// Lifecycle hooks for canvas
+onMounted(() => {
+  if (editedImage.value) {
+    initializeCanvasIfNeeded();
+  }
+});
+
+onUnmounted(() => {
+  stopDrawing();
+});
+
+const downloadEditedImage = () => {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = editedImage.value;
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+
+    // Áp dụng filter
+    ctx.filter = `brightness(${brightness.value}%) contrast(${contrast.value}%) saturate(${saturation.value}%) ${currentFilter.value}`;
+    
+    // Xử lý transform
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((rotateAngle.value * Math.PI) / 180);
+    ctx.scale(flipX.value ? -1 : 1, flipY.value ? -1 : 1);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+    // Xuất ra file
+    const link = document.createElement('a');
+    link.download = `edited-image-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+};
+
 </script>
 
 <template>
@@ -171,7 +372,7 @@ const downloadImage = () => {
         <button 
           class="secondary-btn"
           :disabled="!editedImage"
-          @click="downloadImage"
+          @click="downloadEditedImage"
         >
           <span class="icon">↓</span>
           Download
@@ -250,18 +451,28 @@ const downloadImage = () => {
 
         <!-- Draw Tab Content -->
         <div v-if="activeTab === 'Draw'" class="drawing-controls">
-          <div class="tools">
-            <button 
-              v-for="tool in ['brush', 'rectangle', 'circle']"
-              :key="tool"
-              :class="['tool-btn', { active: selectedTool === tool }]"
-              @click="selectedTool = tool"
-            >
-              <span v-if="tool === 'brush'">✏️</span>
-              <span v-else-if="tool === 'rectangle'">□</span>
-              <span v-else>○</span>
-            </button>
-          </div>
+<div class="tools">
+  <button 
+    v-for="tool in ['brush', 'rectangle', 'eraser']"
+    :key="tool"
+    :class="['tool-btn', { active: selectedTool === tool }]"
+    @click="selectedTool = tool"
+  >
+    <span v-if="tool === 'brush'">✏️</span>
+    <span v-else-if="tool === 'rectangle'">▭</span>
+    <span v-else>⌫</span>
+  </button>
+
+  <!-- Nút đổi ngòi -->
+  <button 
+    class="tool-btn"
+    @click="brushType = brushType === 'round' ? 'square' : 'round'"
+    :title="`Brush tip: ${brushType}`"
+  >
+    {{ brushType === 'round' ? '○' : '□' }}
+  </button>
+</div>
+
 
           <div class="brush-settings">
             <label>Brush Size</label>
@@ -304,7 +515,7 @@ const downloadImage = () => {
       </div>
 
       <!-- Enhanced Canvas Area -->
-      <div 
+        <div 
         class="canvas-area"
         :class="{ 'dragging': isDragging }"
         @dragover.prevent="isDragging = true"
@@ -328,13 +539,33 @@ const downloadImage = () => {
           <div class="spinner"></div>
           <p>Processing...</p>
         </div>
-        <img 
-          v-else 
-          :src="editedImage" 
-          :style="[{ filter: currentFilter || `${imageStyle.filter}` },{transform: imageStyle.transform}]"
-          alt="Editing preview"
-          class="preview-image"
-        />  
+        <template v-else>
+          <div class="image-container">
+            <!-- Preview image layer -->
+            <img 
+              v-if="activeTab !== 'Draw'"
+              :src="editedImage" 
+              :style="[{ filter: currentFilter || `${imageStyle.filter}` },{transform: imageStyle.transform}]"
+              alt="Editing preview"
+              class="preview-image"
+            />
+            <!-- Drawing canvas layer -->
+            <canvas
+              v-if="activeTab === 'Draw'"
+              ref="canvasRef"
+              class="drawing-canvas"
+              :style="[{ filter: currentFilter || `${imageStyle.filter}` },{transform: imageStyle.transform}]"
+              @mousedown.prevent="startDrawing" 
+              @mousemove.prevent="draw"
+              @mouseup.prevent="stopDrawing"
+              @mouseleave.prevent="stopDrawing"
+              @touchstart.prevent="startDrawing"
+              @touchmove.prevent="draw"
+              @touchend.prevent="stopDrawing"
+              
+            ></canvas>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -517,10 +748,35 @@ const downloadImage = () => {
   margin-top: 0.5rem;
 }
 
+.image-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
 .preview-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.drawing-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  cursor: crosshair;
+  /* Tạo pattern checkerboard để hiện vùng trong suốt */
+  background-image: 
+    linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+    linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+    linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  image-rendering: pixelated;
 }
 
 .error-message {
