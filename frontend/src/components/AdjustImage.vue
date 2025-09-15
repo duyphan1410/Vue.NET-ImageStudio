@@ -36,6 +36,103 @@ const selectedTool = ref('brush');
 const brushSize = ref(5);
 const brushColor = ref('#000000');
 
+// Undo/Redo state
+const undoStack = ref([]);
+const redoStack = ref([]);
+const maxStackSize = 20; // Giới hạn số lượng undo để tránh dùng quá nhiều bộ nhớ
+const isFirstDraw = ref(true);
+
+// Thêm function để lưu trạng thái canvas
+const saveCanvasState = () => {
+  if (!canvasRef.value) return;
+
+  // Nếu là lần vẽ đầu tiên, lưu trạng thái canvas trống
+  if (isFirstDraw.value) {
+    const emptyCanvas = document.createElement('canvas');
+    emptyCanvas.width = canvasRef.value.width;
+    emptyCanvas.height = canvasRef.value.height;
+    undoStack.value.push(emptyCanvas.toDataURL());
+    isFirstDraw.value = false;
+  }
+
+  // Lưu trạng thái hiện tại vào undoStack
+  undoStack.value.push(canvasRef.value.toDataURL());
+  // Xóa redoStack khi có action mới
+  redoStack.value = [];
+  // Giới hạn kích thước stack
+  if (undoStack.value.length > maxStackSize) {
+    undoStack.value.shift();
+  }
+};
+const pushUndoState = () => {
+  if (!canvasRef.value) return;
+  // lưu snapshot hiện tại
+  undoStack.value.push(canvasRef.value.toDataURL());
+  // giới hạn size
+  if (undoStack.value.length > maxStackSize) {
+    undoStack.value.shift();
+  }
+  // xóa redo khi có action mới
+  redoStack.value = [];
+};
+
+const undo = () => {
+  if (!canvasRef.value || undoStack.value.length <= 1) return;
+  
+  // Lưu trạng thái hiện tại vào redoStack trước khi undo
+  redoStack.value.push(canvasRef.value.toDataURL());
+  
+  // Xóa trạng thái hiện tại khỏi undoStack
+  undoStack.value.pop();
+  
+  // Lấy trạng thái trước đó (không xóa khỏi undoStack)
+  const previousState = undoStack.value[undoStack.value.length - 1];
+  
+  const img = new Image();
+  img.src = previousState;
+  img.onload = () => {
+    canvasContext.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+    canvasContext.value.drawImage(img, 0, 0);
+  };
+  
+  // Giới hạn kích thước redoStack
+  if (redoStack.value.length > maxStackSize) {
+    redoStack.value.shift();
+  }
+};
+
+// Function redo
+const redo = () => {
+  if (!canvasRef.value || redoStack.value.length === 0) return;
+  
+  // Lấy trạng thái tiếp theo từ redoStack
+  const nextState = redoStack.value.pop();
+  
+  // Lưu trạng thái hiện tại vào undoStack
+  undoStack.value.push(canvasRef.value.toDataURL());
+  
+  const img = new Image();
+  img.src = nextState;
+  img.onload = () => {
+    canvasContext.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+    canvasContext.value.drawImage(img, 0, 0);
+  };
+  
+  // Giới hạn kích thước undoStack
+  if (undoStack.value.length > maxStackSize) {
+    undoStack.value.shift();
+  }
+};
+const canUndo = computed(() =>{
+  console.log('undoStack length:', undoStack.value.length, 'can undo:', undoStack.value.length > 1);
+  return undoStack.value.length > 1;
+});
+const canRedo = computed(() => {
+
+  console.log('redoStack length:', redoStack.value.length , 'can redo:', redoStack.value.length > 0);
+  return redoStack.value.length > 0;
+});
+
 
 
 // File handling
@@ -123,7 +220,6 @@ const flipImage = (axis) => {
   if (axis === 'y') flipY.value = !flipY.value;
 
   // Apply flip immediately using CSS
-  imageStyle.value.transform = `rotate(${rotateAngle.value}deg) scaleX(${flipX.value ? -1 : 1}) scaleY(${flipY.value ? -1 : 1})`;
 
   
 };  
@@ -136,33 +232,30 @@ const initCanvas = () => {
   img.src = editedImage.value;
   
   img.onload = () => {
-    // Get the container dimensions
     const container = canvasRef.value.parentElement;
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
     
-    // Calculate scale to fit image within container while maintaining aspect ratio
     const scale = Math.min(
       containerWidth / img.width,
       containerHeight / img.height
     );
     
-    // Set canvas dimensions to match scaled image
     canvasRef.value.width = img.width;
     canvasRef.value.height = img.height;
-    
-    // Set display size
     canvasRef.value.style.width = `${img.width * scale}px`;
     canvasRef.value.style.height = `${img.height * scale}px`;
     
-    // Get and setup context
     canvasContext.value = canvasRef.value.getContext('2d');
-    
-    // *** FIX: Tạo canvas trong suốt thay vì vẽ image trực tiếp ***
-    // Clear canvas to transparent
     canvasContext.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
-    // Draw image with transparency support
     canvasContext.value.drawImage(img, 0, 0);
+
+    // *** SỬA LỖI: Chỉ reset khi chưa có undo stack ***
+    if (undoStack.value.length === 0) {
+      undoStack.value.push(canvasRef.value.toDataURL());
+      redoStack.value = [];
+      isFirstDraw.value = true;
+    }
   };
 };
 
@@ -189,10 +282,15 @@ const initTempCanvas = () => {
   tempCtx.drawImage(canvasRef.value, 0, 0);
 };
 
-// Cập nhật startDrawing để xử lý eraser
+
 const startDrawing = (e) => {
   if (!canvasContext.value) return;
-  
+
+  if (undoStack.value.length > maxStackSize) {
+    undoStack.value.shift();
+  }
+  redoStack.value = [];
+
   isDrawing.value = true;
   const coords = getCanvasCoordinates(e);
   lastX.value = coords.x;
@@ -204,18 +302,14 @@ const startDrawing = (e) => {
     initTempCanvas();
   }
 
-  // Reset globalCompositeOperation to default for brush
   if (selectedTool.value === 'brush') {
     canvasContext.value.globalCompositeOperation = 'source-over';
-    
-    // Vẽ điểm đầu tiên
     const size = brushSize.value;
     canvasContext.value.beginPath();
     canvasContext.value.arc(coords.x, coords.y, size/2, 0, Math.PI * 2);
     canvasContext.value.fillStyle = brushColor.value;
     canvasContext.value.fill();
   } else if (selectedTool.value === 'eraser') {
-    // Xóa điểm đầu tiên
     const size = brushSize.value;
     canvasContext.value.save();
     canvasContext.value.globalCompositeOperation = 'destination-out';
@@ -224,9 +318,11 @@ const startDrawing = (e) => {
     canvasContext.value.fill();
     canvasContext.value.restore();
   }
+
+  isFirstDraw.value = false;
 };
 
-// Thay thế phần draw function với logic eraser được fix
+
 const draw = (e) => {
   if (!isDrawing.value || !canvasContext.value) return;
 
@@ -236,7 +332,7 @@ const draw = (e) => {
 
   if (selectedTool.value === 'brush') {
     const size = brushSize.value;
-    
+    canvasContext.value.globalCompositeOperation = 'source-over';
     canvasContext.value.beginPath();
     canvasContext.value.moveTo(lastX.value, lastY.value);
     canvasContext.value.lineTo(currentX, currentY);
@@ -246,40 +342,27 @@ const draw = (e) => {
     canvasContext.value.lineJoin = brushType.value;
     canvasContext.value.stroke();
   } else if (selectedTool.value === 'eraser') {
-    // *** FIX: Cách xóa đúng để tạo vùng trong suốt ***
+    // ✅ Xóa từng nét để trong suốt
     const size = brushSize.value;
-    
     canvasContext.value.save();
     canvasContext.value.globalCompositeOperation = 'destination-out';
     canvasContext.value.beginPath();
-    canvasContext.value.arc(currentX, currentY, size / 2, 0, Math.PI * 2);
-    canvasContext.value.fill();
-    
-    // Nếu muốn xóa theo đường thẳng như brush
-    if (lastX.value !== currentX || lastY.value !== currentY) {
-      canvasContext.value.beginPath();
-      canvasContext.value.moveTo(lastX.value, lastY.value);
-      canvasContext.value.lineTo(currentX, currentY);
-      canvasContext.value.lineWidth = size;
-      canvasContext.value.lineCap = 'round';
-      canvasContext.value.lineJoin = 'round';
-      canvasContext.value.stroke();
-    }
-    
+    canvasContext.value.moveTo(lastX.value, lastY.value);
+    canvasContext.value.lineTo(currentX, currentY);
+    canvasContext.value.lineWidth = size;
+    canvasContext.value.lineCap = 'round';
+    canvasContext.value.lineJoin = 'round';
+    canvasContext.value.stroke();
     canvasContext.value.restore();
   } else if (selectedTool.value === 'rectangle') {
     const size = brushSize.value;
-    
     canvasContext.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
     canvasContext.value.drawImage(tempCanvas.value, 0, 0);
-    
     canvasContext.value.beginPath();
     canvasContext.value.moveTo(lastX.value, lastY.value);
     canvasContext.value.lineTo(currentX, currentY);
     canvasContext.value.strokeStyle = brushColor.value;
     canvasContext.value.lineWidth = size;
-    canvasContext.value.lineCap = brushType.value;
-    canvasContext.value.lineJoin = brushType.value;
     canvasContext.value.stroke();
   }
 
@@ -287,11 +370,18 @@ const draw = (e) => {
   lastY.value = currentY;
 };
 
+
 const stopDrawing = () => {
   if (isDrawing.value) {
     isDrawing.value = false;
-    // Update editedImage with the drawn canvas
-    editedImage.value = canvasRef.value.toDataURL('image/png');
+    undoStack.value.push(canvasRef.value.toDataURL());
+    if (undoStack.value.length > maxStackSize) {
+      undoStack.value.shift();
+    }
+    redoStack.value = [];
+    
+    // ✅ Ghi lại kết quả để tab khác dùng
+    editedImage.value = canvasRef.value.toDataURL();
   }
 };
 
@@ -310,7 +400,12 @@ watch(() => activeTab.value, (newTab) => {
     initializeCanvasIfNeeded();
   }
 });
-
+watch(activeTab, (newTab, oldTab) => {
+  // ✅ Mỗi lần rời tab vẽ, lưu canvas hiện tại
+  if (oldTab === 'Draw' && canvasRef.value) {
+    editedImage.value = canvasRef.value.toDataURL();
+  }
+});
 watch(() => editedImage.value, (newImage) => {
   if (activeTab.value === 'Draw' && newImage) {
     initializeCanvasIfNeeded();
@@ -339,7 +434,8 @@ const downloadEditedImage = () => {
     const ctx = canvas.getContext('2d');
 
     // Áp dụng filter
-    ctx.filter = `brightness(${brightness.value}%) contrast(${contrast.value}%) saturate(${saturation.value}%) ${currentFilter.value}`;
+   ctx.filter = `${imageStyle.value.filter} ${currentFilter.value}`;
+
     
     // Xử lý transform
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -471,6 +567,24 @@ const downloadEditedImage = () => {
   >
     {{ brushType === 'round' ? '○' : '□' }}
   </button>
+
+  <!-- Undo/Redo buttons -->
+  <button 
+    class="tool-btn"
+    @click="undo"
+    :disabled="!canUndo"
+    title="Undo"
+  >
+    ↩
+  </button>
+  <button 
+    class="tool-btn"
+    @click="redo"
+    :disabled="!canRedo"
+    title="Redo"
+  >
+    ↪
+  </button>
 </div>
 
 
@@ -545,7 +659,7 @@ const downloadEditedImage = () => {
             <img 
               v-if="activeTab !== 'Draw'"
               :src="editedImage" 
-              :style="[{ filter: currentFilter || `${imageStyle.filter}` },{transform: imageStyle.transform}]"
+              :style="[{ filter: `${imageStyle.filter} ${currentFilter}` }, { transform: imageStyle.transform }]"
               alt="Editing preview"
               class="preview-image"
             />
@@ -554,7 +668,7 @@ const downloadEditedImage = () => {
               v-if="activeTab === 'Draw'"
               ref="canvasRef"
               class="drawing-canvas"
-              :style="[{ filter: currentFilter || `${imageStyle.filter}` },{transform: imageStyle.transform}]"
+              :style="[{ filter: `${imageStyle.filter} ${currentFilter}` }, { transform: imageStyle.transform }]"
               @mousedown.prevent="startDrawing" 
               @mousemove.prevent="draw"
               @mouseup.prevent="stopDrawing"
@@ -852,6 +966,12 @@ const downloadEditedImage = () => {
 .tool-btn.active {
   background: #f4f4f5;
   border-color: #18181B;
+}
+
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f4f4f5;
 }
 
 .brush-settings {
