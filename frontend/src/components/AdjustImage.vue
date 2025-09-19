@@ -65,10 +65,11 @@ const saveCanvasState = () => {
   }
 };
 const pushUndoState = () => {
-  if (!canvasRef.value) return;
-  // lưu snapshot hiện tại
-  undoStack.value.push(canvasRef.value.toDataURL());
-  // giới hạn size
+  
+  if (canvasRef.value) {
+    undoStack.value.push(canvasRef.value.toDataURL());
+  }
+  
   if (undoStack.value.length > maxStackSize) {
     undoStack.value.shift();
   }
@@ -168,6 +169,10 @@ const processFile = (file) => {
     originalImage.value = e.target.result;
     editedImage.value = e.target.result;
     error.value = null;
+    // Reset undo/redo stacks for new image
+    undoStack.value = [];
+    redoStack.value = [];
+    isFirstDraw.value = true;
   };
   reader.readAsDataURL(file);
 };
@@ -210,6 +215,9 @@ const resetToOriginal = () => {
     brightness.value = 100;
     contrast.value = 100;
     saturation.value = 100;
+    rotateAngle.value = 0;
+    flipX.value = false;
+    flipY.value = false;
     currentFilter.value = "";
   }
 };
@@ -379,9 +387,6 @@ const stopDrawing = () => {
       undoStack.value.shift();
     }
     redoStack.value = [];
-    
-    // ✅ Ghi lại kết quả để tab khác dùng
-    editedImage.value = canvasRef.value.toDataURL();
   }
 };
 
@@ -489,7 +494,7 @@ const downloadEditedImage = () => {
     <div class="tabs">
       <button 
         v-for="tab in ['Adjust', 'Filters', 'Draw']" 
-        :key="tab"
+        :key="tab" 
         :class="['tab-btn', { active: activeTab === tab }]"
         @click="switchTab(tab)"
       >
