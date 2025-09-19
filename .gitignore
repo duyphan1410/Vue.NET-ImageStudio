@@ -1,11 +1,11 @@
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-/BackendApi/obj/
-/BackendApi/bin/
+# --------------------------
+# Build folders
+# --------------------------
+bin/
+obj/
+BackendApi/obj/
+BackendApi/bin/
+
 # --------------------------
 # Node / Vue.js
 # --------------------------
@@ -16,24 +16,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.local
-
 *.cache
 *.temp
 .cache/
 .temp/
+package-lock.json
 
-bin/
-obj/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-*.vs/
-project.lock.json
-project.fragment.lock.json
-artifacts/
-
+# --------------------------
 # ASP.NET Scaffolding
+# --------------------------
 ScaffoldingReadMe.txt
 
 # --------------------------
@@ -60,6 +51,18 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # --------------------------
+# Visual Studio
+# --------------------------
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# --------------------------
 # Visual Studio Code
 # --------------------------
 .vscode/
@@ -74,5 +77,6 @@ Thumbs.db
 ehthumbs.db
 Icon?
 desktop.ini
-package-lock.json
+
+# Custom
 runWeb.bat
