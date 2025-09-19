@@ -1,0 +1,16 @@
+{
+  "name": "image-studio",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\" \"npm run python\"",
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd BackendApi && dotnet run",
+    "python": "cd BackendApi/PythonScripts && uvicorn remove_bg:app --host 0.0.0.0 --port 8000"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
