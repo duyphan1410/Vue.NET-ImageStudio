@@ -1,23 +1,82 @@
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfo.cs
-BackendApi/obj/Debug/net8.0/BackendApi.AssemblyInfoInputs.cache
+# --------------------------
 # Build folders
+# --------------------------
 bin/
 obj/
+BackendApi/obj/
+BackendApi/bin/
 
-# Visual Studio files
+# --------------------------
+# Node / Vue.js
+# --------------------------
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.local
+*.cache
+*.temp
+.cache/
+.temp/
+package-lock.json
+
+# --------------------------
+# ASP.NET Scaffolding
+# --------------------------
+ScaffoldingReadMe.txt
+
+# --------------------------
+# Python
+# --------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.egg
+*.manifest
+*.spec
+*.log
+*.tmp
+.env
+venv/
+ENV/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --------------------------
+# Visual Studio
+# --------------------------
 .vs/
-
-# User-specific files
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+project.fragment.lock.json
+artifacts/
 
-# Logs
-*.log
+# --------------------------
+# Visual Studio Code
+# --------------------------
+.vscode/
+.history/
+*.code-workspace
 
-# Temporary
-*.tmp
-*.temp
+# --------------------------
+# OS files
+# --------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+
+# Custom
+runWeb.bat
