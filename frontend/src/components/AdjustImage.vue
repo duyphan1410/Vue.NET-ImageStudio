@@ -591,8 +591,6 @@ const downloadEditedImage = () => {
     ↪
   </button>
 </div>
-
-
           <div class="brush-settings">
             <label>Brush Size</label>
             <input 
@@ -614,7 +612,6 @@ const downloadEditedImage = () => {
         <!-- Common Controls -->
         <div class="common-controls">
           <button class="reset-btn" @click="resetToOriginal">Reset to Original</button>
-          
           <div class="transform-controls">
             <!-- slider for rotate -->
             <div class="rotate-slider">
