@@ -3,7 +3,6 @@
     <nav class="navbar">
       <div class="nav-container">
         <router-link to="/">Trang chủ</router-link>
-        <router-link to="/Hello">Hello</router-link>
         <router-link to="/remove-bg">RemoveBG</router-link>
         <router-link to="/paint-image">Paint Image</router-link>
         <router-link to="/adjust-image">Adjust Image</router-link>
