@@ -18,6 +18,19 @@ export const LayerService = {
     return fabricInstance.toJSON();
   },
 
+  exportProjectState(layersArray) {
+    // Map qua từng layer để lấy JSON
+    return layersArray.map(layer => ({
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible,
+      // Lưu ý: Chỉ lưu data nếu fabric instance tồn tại
+      canvasData: layer.fabric 
+          ? layer.fabric.toJSON() 
+          : (layer.pendingData || null)
+    }));
+  },
+
   // 2. Nạp dữ liệu vào Canvas mới (kèm logic dịch chuyển vị trí)
   async loadFromJSON(fabricInstance, json) {
     if (!fabricInstance || !json) return;
@@ -26,13 +39,13 @@ export const LayerService = {
     await fabricInstance.loadFromJSON(json);
 
     // Logic Offset: Dịch chuyển các object một chút để người dùng biết là đã duplicate
-    fabricInstance.getObjects().forEach(obj => {
-      obj.set({
-        left: (obj.left || 0) + 20, // Dịch sang phải 20px
-        top: (obj.top || 0) + 20,   // Dịch xuống dưới 20px
-      });
-      obj.setCoords(); // Cập nhật lại tọa độ click
-    });
+    // fabricInstance.getObjects().forEach(obj => {
+    //   obj.set({
+    //     left: (obj.left || 0) + 20, // Dịch sang phải 20px
+    //     top: (obj.top || 0) + 20,   // Dịch xuống dưới 20px
+    //   });
+    //   obj.setCoords(); // Cập nhật lại tọa độ click
+    // });
 
     fabricInstance.requestRenderAll();
   },

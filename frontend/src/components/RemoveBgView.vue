@@ -3,32 +3,59 @@ import { ref } from "vue";
 import api from "../services/api";
 
 const selectedFile = ref(null);
+const originalImage = ref(null);
 const resultImage = ref(null);
 const isLoading = ref(false);
 const error = ref(null);
+const isDragging = ref(false);
+const uploadRef = ref(null);
 
 const onFileChange = (e) => {
-  selectedFile.value = e.target.files[0];
-  resultImage.value = null; // Clear previous result
-  error.value = null; // Clear previous error
+  const file = e.target.files[0];
+  if (file) processFile(file);
 };
 
-const uploadFile = async () => {
-  if (!selectedFile.value) {
-    error.value = "Please select a file first";
-    return;
-  }
-
+const processFile = (file) => {
   // Validate file type
   const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  if (!validTypes.includes(selectedFile.value.type)) {
+  if (!validTypes.includes(file.type)) {
     error.value = "Please select a valid image file (JPEG, PNG, WebP)";
     return;
   }
 
   // Validate file size (max 10MB)
-  if (selectedFile.value.size > 10 * 1024 * 1024) {
+  if (file.size > 10 * 1024 * 1024) {
     error.value = "File size must be less than 10MB";
+    return;
+  }
+
+  selectedFile.value = file;
+  
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    originalImage.value = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  
+  resultImage.value = null;
+  error.value = null;
+};
+
+const handleFileDrop = (e) => {
+  e.preventDefault();
+  isDragging.value = false;
+  const file = e.dataTransfer?.files[0];
+  if (file) processFile(file);
+};
+
+const triggerFileInput = () => {
+  uploadRef.value?.click();
+};
+
+const uploadFile = async () => {
+  if (!selectedFile.value) {
+    error.value = "Please select a file first";
     return;
   }
 
@@ -43,7 +70,7 @@ const uploadFile = async () => {
       headers: { 
         "Content-Type": "multipart/form-data" 
       },
-      timeout: 60000 // 60 seconds timeout
+      timeout: 60000
     });
 
     if (res.data && res.data.image) {
@@ -55,265 +82,605 @@ const uploadFile = async () => {
     console.error("Upload error:", err);
     
     if (err.response) {
-      // Server responded with error status
       error.value = err.response.data?.error || `Server error: ${err.response.status}`;
     } else if (err.request) {
-      // Request was made but no response received
       error.value = "No response from server. Please check your connection.";
     } else {
-      // Something else happened
       error.value = "An unexpected error occurred";
     }
   } finally {
     isLoading.value = false;
   }
 };
+
+const downloadResult = () => {
+  if (!resultImage.value) return;
+  const link = document.createElement('a');
+  link.download = `removed_bg_${Date.now()}.png`;
+  link.href = resultImage.value;
+  link.click();
+};
+
+const reset = () => {
+  selectedFile.value = null;
+  originalImage.value = null;
+  resultImage.value = null;
+  error.value = null;
+};
 </script>
 
 <template>
-  <div class="container">
-    <h1 class="title">Remove Background Demo</h1>
-    
-    <div class="upload-section">
-      <div class="file-input-wrapper">
-        <input 
-          type="file" 
-          @change="onFileChange" 
-          accept="image/*"
-          :disabled="isLoading"
-          class="file-input"
-        />
+  <div class="remove-bg-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>Remove Background</h1>
+        <p class="subtitle">Remove image background automatically</p>
       </div>
-      <button 
-        @click="uploadFile" 
-        :disabled="!selectedFile || isLoading"
-        class="upload-button"
+      <div class="header-actions">
+        <button 
+          v-if="originalImage"
+          class="secondary-btn"
+          @click="reset"
+        >
+          <span class="icon">🔄</span>
+          Reset
+        </button>
+        <button 
+          class="primary-btn"
+          :disabled="!resultImage"
+          @click="downloadResult"
+        >
+          <span class="icon">💾</span>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input
+      ref="uploadRef"
+      type="file"
+      @change="onFileChange"
+      accept="image/*"
+      class="hidden-input"
+    />
+
+    <!-- Main Content -->
+    <div class="content">
+      <!-- Upload Area or Preview -->
+      <div 
+        v-if="!originalImage"
+        class="upload-area"
+        :class="{ 'dragging': isDragging }"
+        @dragover.prevent="isDragging = true"
+        @dragleave.prevent="isDragging = false"
+        @drop="handleFileDrop"
       >
-        {{ isLoading ? 'Processing...' : 'Upload & Remove BG' }}
-      </button>
-    </div>
-
-    <!-- Error display -->
-    <div v-if="error" class="error">
-      <p>Error: {{ error }}</p>
-    </div>
-
-    <!-- Loading indicator -->
-    <div v-if="isLoading" class="loading">
-      <p>Processing image... Please wait.</p>
-    </div>
-
-    <!-- Result display -->
-    <div v-if="resultImage" class="result">
-      <h2>Result:</h2>
-      <div class="image-container">
-        <img :src="resultImage" alt="Processed" class="result-image" />
+        <div class="upload-content">
+          <div class="upload-icon">📸</div>
+          <h2>Drop your image here</h2>
+          <p>or</p>
+          <button class="upload-btn" @click="triggerFileInput">
+            Choose File
+          </button>
+          <p class="upload-hint">
+            Supports: JPG, PNG, WebP (max 10MB)
+          </p>
+        </div>
       </div>
-      <div class="download-section">
-        <a :href="resultImage" :download="`removed_bg_${Date.now()}.png`" class="download-link">
-          <button class="download-button">Download Result</button>
-        </a>
+
+      <!-- Comparison View -->
+      <div v-else class="comparison-view">
+        <!-- Original Image -->
+        <div class="image-panel">
+          <div class="panel-header">
+            <h3>Original</h3>
+          </div>
+          <div class="image-container">
+            <img :src="originalImage" alt="Original" />
+          </div>
+        </div>
+
+        <!-- Arrow or Process Button -->
+        <div class="separator">
+          <button 
+            v-if="!resultImage && !isLoading"
+            class="process-btn"
+            @click="uploadFile"
+          >
+            <span class="arrow">→</span>
+            <span class="text">Process</span>
+          </button>
+          <div v-if="isLoading" class="loading-indicator">
+            <div class="spinner"></div>
+            <p>Removing background...</p>
+          </div>
+          <div v-if="resultImage" class="success-indicator">
+            <span class="checkmark">✓</span>
+          </div>
+        </div>
+
+        <!-- Result Image -->
+        <div class="image-panel">
+          <div class="panel-header">
+            <h3>Result</h3>
+          </div>
+          <div class="image-container with-checker">
+            <img 
+              v-if="resultImage" 
+              :src="resultImage" 
+              alt="Result"
+            />
+            <div v-else class="placeholder">
+              <span class="placeholder-icon">🖼️</span>
+              <p>Result will appear here</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Error Toast -->
+    <transition name="slide-up">
+      <div v-if="error" class="error-toast">
+        <span class="error-icon">⚠️</span>
+        <p>{{ error }}</p>
+        <button @click="error = null" class="close-btn">✕</button>
+      </div>
+    </transition>
   </div>
 </template>
 
 <style scoped>
-.container {
+.remove-bg-container {
   width: 100%;
-  margin: 0 auto;
-  padding: 20px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  background-color: white;
-  color: black;
-  min-height: calc(100vh - 80px);
+  background: #1e1e1e;
+  color: #e0e0e0;
+  overflow: hidden;
 }
 
-.title {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-  font-size: 2rem;
+/* Header */
+.header {
+  padding: 5px 24px;
+  border-bottom: 1px solid #2d2d2d;
+  border-bottom-right-radius: 2%;
+  border-bottom-left-radius: 2%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #252525;
+  flex-shrink: 0;
+}
+
+.header-left h1 {
+  font-size: 20px;
   font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #e0e0e0;
 }
 
-.upload-section {
-  width: 100%;
-  max-width: 500px;
-  margin: 20px 0;
+.subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.header-actions {
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-  align-items: center;
+  gap: 12px;
 }
 
-.file-input-wrapper {
-  width: 100%;
-}
-
-.file-input {
-  width: 100%;
-  padding: 12px;
-  border: 2px dashed #007bff;
-  border-radius: 8px;
-  background-color: #f8f9fa;
+.primary-btn,
+.secondary-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.file-input:hover {
-  border-color: #0056b3;
-  background-color: #e9ecef;
-}
-
-.file-input:disabled {
-  background-color: #e9ecef;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.upload-button {
-  padding: 12px 24px;
-  background-color: #007bff;
-  color: white;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-  min-width: 200px;
 }
 
-.upload-button:hover:not(:disabled) {
-  background-color: #0056b3;
+.primary-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
-.upload-button:disabled {
-  background-color: #6c757d;
+.primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.error {
-  width: 100%;
-  max-width: 500px;
-  background-color: #f8d7da;
-  color: #721c24;
-  padding: 15px;
-  border-radius: 6px;
-  margin: 10px 0;
-  border: 1px solid #f5c6cb;
+.secondary-btn {
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  color: #e0e0e0;
 }
 
-.loading {
-  width: 100%;
-  max-width: 500px;
-  background-color: #d1ecf1;
-  color: #0c5460;
-  padding: 15px;
-  border-radius: 6px;
-  margin: 10px 0;
-  border: 1px solid #bee5eb;
-  text-align: center;
+.secondary-btn:hover {
+  background: #2d2d2d;
+  border-color: #4a4a4a;
 }
 
-.result {
+.icon {
+  font-size: 16px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+/* Content */
+.content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+/* Upload Area */
+.upload-area {
   width: 100%;
   max-width: 600px;
-  margin-top: 30px;
+  height: 400px;
+  border: 2px dashed #3a3a3a;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #252525;
+  transition: all 0.3s;
+}
+
+.upload-area.dragging {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.upload-content {
   text-align: center;
 }
 
-.result h2 {
-  margin-bottom: 20px;
-  color: #333;
+.upload-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.upload-content h2 {
+  font-size: 20px;
+  margin: 0 0 12px 0;
+  color: #e0e0e0;
+}
+
+.upload-content p {
+  color: #888;
+  margin: 12px 0;
+}
+
+.upload-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.upload-hint {
+  font-size: 13px;
+  color: #666;
+  margin-top: 16px;
+}
+
+/* Comparison View */
+.comparison-view {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  width: 100%;
+  max-width: 1400px;
+  align-items: center;
+}
+
+.image-panel {
+  background: #252525;
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+}
+
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #3a3a3a;
+  background: #2d2d2d;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
 }
 
 .image-container {
-  margin: 20px 0;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  padding: 20px;
-  background-color: #f8f9fa;
+  flex: 1;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
 }
 
-.result-image {
+.image-container img {
   max-width: 100%;
-  max-height: 500px;
-  height: auto;
-  border-radius: 4px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
-.download-section {
-  margin-top: 20px;
+.image-container.with-checker {
+  background-image:
+    linear-gradient(45deg, #2d2d2d 25%, transparent 25%),
+    linear-gradient(-45deg, #2d2d2d 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2d2d2d 75%),
+    linear-gradient(-45deg, transparent 75%, #2d2d2d 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #1e1e1e;
 }
 
-.download-link {
-  text-decoration: none;
+.placeholder {
+  text-align: center;
+  color: #666;
 }
 
-.download-button {
-  padding: 12px 24px;
-  background-color: #28a745;
+.placeholder-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.placeholder p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Separator */
+.separator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.process-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  padding: 16px 24px;
+  border-radius: 50px;
   font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.download-button:hover {
-  background-color: #218838;
+.process-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  .container {
-    padding: 15px;
+.process-btn .arrow {
+  font-size: 24px;
+}
+
+.process-btn .text {
+  font-size: 13px;
+}
+
+.loading-indicator {
+  text-align: center;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #3a3a3a;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+
+.loading-indicator p {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.success-indicator {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.3s ease-out;
+}
+
+.checkmark {
+  font-size: 32px;
+  color: white;
+}
+
+/* Error Toast */
+.error-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #2d2d2d;
+  border: 1px solid #ff6b6b;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 400px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.error-icon {
+  font-size: 20px;
+}
+
+.error-toast p {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  color: #ff6b6b;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+/* Animations */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
   }
-  
-  .title {
-    font-size: 1.5rem;
-  }
-  
-  .upload-section {
-    max-width: 100%;
-  }
-  
-  .error, .loading {
-    max-width: 100%;
-  }
-  
-  .result {
-    max-width: 100%;
-  }
-  
-  .image-container {
-    padding: 15px;
+  to {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
-@media (max-width: 480px) {
-  .container {
-    padding: 10px;
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100px);
+  opacity: 0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .comparison-view {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 20px;
   }
-  
-  .upload-button, .download-button {
-    width: 100%;
+
+  .separator {
+    flex-direction: row;
     min-width: auto;
   }
-  
-  .file-input {
-    padding: 10px;
+
+  .process-btn {
+    flex-direction: row;
+    padding: 12px 24px;
+  }
+
+  .process-btn .arrow {
+    transform: rotate(90deg);
+  }
+
+  .image-panel {
+    height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .primary-btn,
+  .secondary-btn {
+    flex: 1;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .upload-area {
+    height: 300px;
+  }
+
+  .image-panel {
+    height: 300px;
+  }
+
+  .error-toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
   }
 }
 </style>

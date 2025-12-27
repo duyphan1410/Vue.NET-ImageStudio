@@ -1,13 +1,44 @@
 <template>
   <div id="app-root">
-    <nav class="navbar">
-      <div class="nav-container">
-        <router-link to="/">Trang chủ</router-link>
-        <router-link to="/remove-bg">RemoveBG</router-link>
-        <router-link to="/paint-image">Paint Image</router-link>
-        <router-link to="/adjust-image">Adjust Image</router-link>
+    <!-- Compact Header cho Image Editor -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="app-brand">
+          <span class="brand-icon">🎨</span>
+          <span class="brand-name">ImageStudio</span>
+        </div>
+        
+        <nav class="main-nav">
+          <router-link to="/" class="nav-link">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-text">Home</span>
+          </router-link>
+          <router-link to="/remove-bg" class="nav-link">
+            <span class="nav-icon">✂️</span>
+            <span class="nav-text">Remove BG</span>
+          </router-link>
+          <router-link to="/paint-image" class="nav-link">
+            <span class="nav-icon">🖌️</span>
+            <span class="nav-text">Paint</span>
+          </router-link>
+          <router-link to="/adjust-image" class="nav-link">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-text">Adjust</span>
+          </router-link>
+        </nav>
       </div>
-    </nav>
+
+      <div class="header-right">
+        <button class="header-btn" title="Export">
+          <span>💾</span>
+        </button>
+        <button class="header-btn" title="Settings">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content - Full Height -->
     <main class="main-content">
       <router-view></router-view>
     </main>
@@ -15,7 +46,7 @@
 </template>
 
 <style>
-/* CSS toàn cục, không cần 'scoped' */
+/* CSS toàn cục */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -26,116 +57,184 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background-color: white !important;
-  color: black !important;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   width: 100%;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden; /* Ngăn scroll toàn trang */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 #app {
-  width: 100vw; /* ← Dùng viewport width */
+  width: 100vw;
   height: 100vh;
-  background-color: white !important;
-  color: black !important;
-  overflow-x: hidden;
+  overflow: hidden;
+  background: #1e1e1e;
 }
 
-/* Đảm bảo các element không bị dark mode */
-div,
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-span,
-button,
-input {
-  color: inherit;
-}
-
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
+#app-root {
   width: 100%;
-  height: 60px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Compact Header - chỉ 48px */
+.app-header {
+  height: 48px;
+  min-height: 48px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2d2d2d;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 1000;
-  background-color: #f0f0f0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
 }
 
-.nav-container {
-  width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 0 20px;
+.header-left {
   display: flex;
-  gap: 20px;
   align-items: center;
+  gap: 24px;
 }
 
-.navbar a {
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 24px;
+  border-right: 1px solid #2d2d2d;
+}
+
+.brand-icon {
+  font-size: 20px;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+}
+
+.main-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
   text-decoration: none;
-  font-weight: bold;
-  color: #333;
-  padding: 10px 16px;
-  border-radius: 5px;
-  transition: background-color 0.3s ease;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
-.navbar a:hover {
-  background-color: #e0e0e0;
+.nav-link:hover {
+  background: #2d2d2d;
+  color: #e0e0e0;
 }
 
-.navbar a.router-link-exact-active {
-  color: #007bff;
-  background-color: #e0f0ff;
+.nav-link.router-link-exact-active {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+  color: #667eea;
+  font-weight: 600;
 }
 
-.main-content {
-  padding-top: 70px;
-  width: 100%;
-  min-height: calc(100vh - 80px);
-  margin: 0 auto;
+.nav-icon {
+  font-size: 16px;
+}
+
+.nav-text {
+  font-size: 13px;
+}
+
+.header-right {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  align-items: center;
+  gap: 6px;
 }
 
-/* Responsive design */
+.header-btn {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.header-btn:hover {
+  background: #2d2d2d;
+  border-color: #3a3a3a;
+}
+
+/* Main Content - Full Height trừ header */
+.main-content {
+  flex: 1;
+  width: 100%;
+  height: calc(100vh - 48px);
+  overflow: hidden; /* Child components sẽ tự handle scroll nếu cần */
+  position: relative;
+}
+
+/* Responsive cho màn hình nhỏ */
 @media (max-width: 768px) {
-  .nav-container {
-    padding: 0 15px;
-    gap: 15px;
+  .brand-name {
+    display: none; /* Ẩn tên brand trên mobile */
   }
 
-  .navbar a {
-    padding: 8px 12px;
-    font-size: 14px;
+  .nav-text {
+    display: none; /* Chỉ hiện icon trên mobile */
   }
 
-  .main-content {
-    padding-left: 15px;
-    padding-right: 15px;
+  .nav-link {
+    padding: 6px 10px;
+  }
+
+  .app-brand {
+    padding-right: 16px;
+  }
+
+  .main-nav {
+    gap: 2px;
   }
 }
 
 @media (max-width: 480px) {
-  .nav-container {
-    gap: 10px;
+  .app-header {
+    padding: 0 12px;
   }
 
-  .navbar a {
-    padding: 6px 10px;
-    font-size: 13px;
+  .header-left {
+    gap: 12px;
   }
+
+  .header-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+}
+
+/* Đảm bảo không bị dark mode override */
+div, p, h1, h2, h3, h4, h5, h6, span, button, input {
+  color: inherit;
 }
 </style>

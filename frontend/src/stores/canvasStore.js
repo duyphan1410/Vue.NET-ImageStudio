@@ -12,6 +12,10 @@ export const useCanvasStore = defineStore('canvas', {
     brushSize: 5,
     brushColor: '#000000',
     thumbnailRefs: new Map(),
+
+    historyStack: [],     // Ngăn xếp lưu lịch sử
+    historyIndex: -1,     // Con trỏ vị trí hiện tại (-1 là chưa có gì)
+    isUndoing: false,     // Cờ báo hiệu đang Undo/Redo để chặn Save đè
   }),
 
   getters: {
@@ -28,6 +32,7 @@ export const useCanvasStore = defineStore('canvas', {
       if (this.layers.length === 0) {
         this.addLayer('Layer 1');
       }
+      this.saveState();
     },
 
     addLayer(name = 'New Layer') {
@@ -43,6 +48,7 @@ export const useCanvasStore = defineStore('canvas', {
       this.selectedId = newId; 
 
       this.updateLayerInteractions();
+      this.saveState();
     },
 
     registerLayerCanvas(layerId, el) {
@@ -56,8 +62,9 @@ export const useCanvasStore = defineStore('canvas', {
            layer.canvasEl = el;
         }
         
-        
-        // CRITICAL FIX: Sau khi Vue re-render, phải apply lại tool
+        this.triggerUpdateThumbnail(layerId);
+
+        // Sau khi Vue re-render, phải apply lại tool
         // Vì Fabric có thể bị reset state
         if (this.selectedId === layerId) {
           console.log(`[Re-link] Re-applying tool to ${layerId}`);
@@ -84,23 +91,45 @@ export const useCanvasStore = defineStore('canvas', {
             e.path.globalCompositeOperation = 'destination-out';
          }
          this.triggerUpdateThumbnail(layerId);
+         this.saveState()
       });
-      fabricCanvas.on('object:modified', () => this.triggerUpdateThumbnail(layerId));
-      fabricCanvas.on('object:removed', () => this.triggerUpdateThumbnail(layerId));
+      fabricCanvas.on('object:modified', () => {
+        this.triggerUpdateThumbnail(layerId);
+        this.saveState()
+      });
+      fabricCanvas.on('object:removed', () => {
+        this.triggerUpdateThumbnail(layerId);
+        this.saveState()
+      });
 
       // Cập nhật quyền tương tác
       this.updateLayerInteractions();
 
-      if (layer.clonedData) {
-            console.log(`[Duplicate] Loading data for ${layerId}`);
-            // Gọi Service nạp dữ liệu vào
-            LayerService.loadFromJSON(fabricCanvas, layer.clonedData).then(() => {
-                // Nạp xong thì xóa data tạm đi cho nhẹ
-                delete layer.clonedData;
-                // Update lại thumbnail cho layer mới
-                this.triggerUpdateThumbnail(layerId);
-            });
-        }
+      // if (layer.clonedData) {
+      //       console.log(`[Duplicate] Loading data for ${layerId}`);
+      //       // Gọi Service nạp dữ liệu vào
+      //       LayerService.loadFromJSON(fabricCanvas, layer.clonedData).then(() => {
+      //           // Nạp xong thì xóa data tạm đi cho nhẹ
+      //           delete layer.clonedData;
+      //           // Update lại thumbnail cho layer mới
+      //           this.triggerUpdateThumbnail(layerId);
+      //       });
+      // }
+
+      // NẠP DỮ LIỆU TỪ LỊCH SỬ HOẶC DUPLICATE
+      const dataToLoad = layer.clonedData || layer.pendingData;
+        
+      if (dataToLoad) {
+          console.log(`[Duplicate] Loading data for ${layerId}`);
+          LayerService.loadFromJSON(fabricCanvas, dataToLoad).then(() => {
+              delete layer.clonedData;
+              delete layer.pendingData;
+              this.triggerUpdateThumbnail(layerId);
+          });
+      } else {
+          // Nếu là layer trắng tinh mới tạo, cũng render thumbnail (để ra màu trắng/caro)
+          this.triggerUpdateThumbnail(layerId);
+      }
 
       // Nếu đây là layer đang chọn, apply tool ngay
       if (this.selectedId === layerId) {
@@ -123,7 +152,7 @@ export const useCanvasStore = defineStore('canvas', {
           console.log(`  ✅ ${layer.id}: ENABLED (drawing + selection)`);
           
           // Layer được chọn: Bật TẤT CẢ tính năng
-          layer.fabric.selection = true; 
+          // layer.fabric.selection = true; 
           layer.fabric.skipTargetFind = false;
           layer.fabric.interactive = true; // Đảm bảo tương tác
           
@@ -137,7 +166,7 @@ export const useCanvasStore = defineStore('canvas', {
           console.log(`  ❌ ${layer.id}: DISABLED (no interaction)`);
           
           // Layer KHÔNG được chọn: TẮT HOÀN TOÀN
-          layer.fabric.isDrawingMode = false; // Tắt vẽ
+          // layer.fabric.isDrawingMode = false; // Tắt vẽ
           layer.fabric.selection = false;     // Tắt selection box
           layer.fabric.skipTargetFind = true; // Bỏ qua mọi click
           layer.fabric.interactive = false;   // Tắt tương tác
@@ -169,6 +198,8 @@ export const useCanvasStore = defineStore('canvas', {
         
         console.log(`[Tool] Applying "${this.activeTool}" to canvas`);
 
+        // Reset ALL tools
+        ToolService.resetAllTools(canvas);
         // Reset các layer khác
         this.layers.forEach(l => {
             if (l.fabric && l.fabric !== canvas) {
@@ -188,12 +219,18 @@ export const useCanvasStore = defineStore('canvas', {
                 color: this.brushColor
             });
         } else if (['rectangle', 'circle'].includes(this.activeTool)) {
-            ToolService.setupShapeListeners(canvas, this.activeTool, this.brushColor);
+            ToolService.setupShapeListeners(canvas, this.activeTool, this.brushColor,this.brushSize);
+            canvas.selection = false;
+            canvas.forEachObject(obj => {
+              obj.selectable = false; 
+              obj.evented = false;
+            });
         } else if (this.activeTool === 'select') {
             ToolService.clearShapeListeners(canvas);
              canvas.isDrawingMode = false;
              canvas.selection = true;
              canvas.skipTargetFind = false;
+             canvas.defaultCursor = 'default';
 
              canvas.forEachObject(obj => {
                obj.selectable = true;
@@ -272,6 +309,8 @@ export const useCanvasStore = defineStore('canvas', {
             const layer = this.layers.splice(index, 1)[0];
             this.layers.unshift(layer);
         }
+        this.updateLayerInteractions();
+        this.saveState();
     },
 
     async duplicateActiveLayer() {
@@ -279,9 +318,17 @@ export const useCanvasStore = defineStore('canvas', {
         const originalLayer = this.layers.find(l => l.id === this.selectedId);
         if (!originalLayer || !originalLayer.fabric) return;
 
-        // 2. Nhờ Service lấy dữ liệu (JSON)
-        const jsonData = LayerService.serializeCanvas(originalLayer.fabric);
+        // Nhờ Service lấy dữ liệu (JSON)
+        const jsonSnapshot = originalLayer.fabric.toJSON();
+        const jsonClone = JSON.parse(JSON.stringify(jsonSnapshot));
 
+        // LOGIC OFFSET DI CHUYỂN NGAY TRÊN DỮ LIỆU (Chỉ chạy khi Duplicate)
+        if (jsonClone.objects && Array.isArray(jsonClone.objects)) {
+            jsonClone.objects.forEach(obj => {
+                obj.left = (obj.left || 0) + 20;
+                obj.top = (obj.top || 0) + 20;
+            });
+        }
         // 3. Tạo ID mới
         const newId = `layer_${Date.now()}`;
 
@@ -296,11 +343,12 @@ export const useCanvasStore = defineStore('canvas', {
             visible: true,
             canvasEl: null,
             fabric: null,
-            clonedData: jsonData // <--- Dữ liệu chờ được nạp
+            pendingData: jsonClone// <--- Dữ liệu chờ được nạp
         });
 
         // 6. Chọn layer mới (việc nạp data sẽ do registerLayerCanvas lo)
         this.selectLayer(newId);
+        this.saveState();
     },
 
     // --- LOGIC REMOVE (LÀM MỚI) ---
@@ -338,68 +386,96 @@ export const useCanvasStore = defineStore('canvas', {
         
         // 4. Update lại Z-Index cho các layer còn lại
         this.updateLayerInteractions();
+        this.saveState();
     },
 
     clearLayerContent(id) {
         const layer = this.layers.find(l => l.id === id);
         if (layer && layer.fabric) {
-            // Gọi Service để xóa sạch
+            /// 1. Chặn Auto-save
+            this.isUndoing = true; 
+
+            // 2. Xóa & Update Thumbnail
             LayerService.clearCanvas(layer.fabric);
-            this.triggerUpdateThumbnail(id); // Nhớ update lại ảnh thu nhỏ
+            this.triggerUpdateThumbnail(id); 
+
+            // 3. Mở lại Auto-save
+            this.isUndoing = false;
         }
+        this.saveState();
     },
     
-    // async duplicateActiveLayer() {
-    //   const active = this.activeLayer;
-    //   if (!active?.fabric) return;
+    saveState() {
+        // Nếu đang trong quá trình Undo/Redo thì KHÔNG lưu đè
+        if (this.isUndoing) return;
 
-    //   const newId = `layer_${Date.now()}`;
-    //   const jsonData = active.fabric.toJSON();
+        // Nếu đang đứng ở quá khứ mà vẽ nét mới -> Xóa tương lai đi
+        // Ví dụ: A -> B -> C. Undo về B. Vẽ nét D. Kết quả: A -> B -> D (C bị xóa)
+        if (this.historyIndex < this.historyStack.length - 1) {
+            this.historyStack = this.historyStack.slice(0, this.historyIndex + 1);
+        }
 
-    //   this.layers.push({
-    //     id: newId,
-    //     name: active.name + ' Copy',
-    //     visible: true,
-    //     canvasEl: null,
-    //     fabric: null
-    //   });
+        // Tạo Snapshot
+        const snapshot = LayerService.exportProjectState(this.layers);
+        
+        // Đẩy vào stack
+        this.historyStack.push(snapshot);
+        this.historyIndex++;
+        
+        // Giới hạn 20 bước (để tiết kiệm RAM)
+        if (this.historyStack.length > 20) {
+            this.historyStack.shift();
+            this.historyIndex--;
+        }
 
-    //   await this.$nextTick();
+        console.log(`[History] Saved. Steps: ${this.historyIndex + 1}/${this.historyStack.length}`);
+    },
 
-    //   const newLayer = this.layers.find(l => l.id === newId);
-    //   if (newLayer?.fabric) {
-    //     newLayer.fabric.loadFromJSON(jsonData, () => {
-    //       newLayer.fabric.requestRenderAll();
-    //       this.triggerUpdateThumbnail(newId);
-    //     });
-    //   }
+    async undo() {
+        if (this.historyIndex <= 0) return; // Không còn gì để lùi
 
-    //   this.selectedId = newId;
-    //   this.updateLayerInteractions();
-    // },
-    
-    // removeLayer(id) {
-    //   if (this.layers.length <= 1) {
-    //     alert('Cannot delete the last layer!');
-    //     return;
-    //   }
+        this.isUndoing = true; // Bật cờ
+        this.historyIndex--;   // Lùi con trỏ
+        await this.loadState(this.historyStack[this.historyIndex]);
+        this.isUndoing = false; // Tắt cờ
+    },
 
-    //   const index = this.layers.findIndex(l => l.id === id);
-    //   if (index === -1) return;
+    async redo() {
+        if (this.historyIndex >= this.historyStack.length - 1) return; // Không còn tương lai
 
-    //   const layer = this.layers[index];
-    //   if (layer.fabric) {
-    //     layer.fabric.dispose();
-    //   }
+        this.isUndoing = true;
+        this.historyIndex++;   // Tiến con trỏ
+        await this.loadState(this.historyStack[this.historyIndex]);
+        this.isUndoing = false;
+    },
 
-    //   this.layers.splice(index, 1);
-    //   this.thumbnailRefs.delete(id);
+    async loadState(snapshot) {
+        if (!snapshot) return;
 
-    //   if (this.selectedId === id) {
-    //     this.selectedId = this.layers[Math.max(0, index - 1)].id;
-    //     this.updateLayerInteractions();
-    //     this.applyCurrentTool();
-    //   }
-    // }
+        console.log('[History] Loading snapshot...');
+
+        // Bước 1: Dọn dẹp layer cũ (Tránh leak memory)
+        this.layers.forEach(l => {
+             if (l.fabric) LayerService.disposeCanvas(l.fabric);
+        });
+
+        // Bước 2: Gán dữ liệu mới vào State
+        // Vue sẽ tự động render lại <canvas> nhờ v-for
+        this.layers = snapshot.map(item => ({
+            id: item.id,
+            name: item.name,
+            visible: item.visible,
+            canvasEl: null, // Sẽ được bind lại
+            fabric: null,   // Sẽ được init lại
+            pendingData: item.canvasData // Dữ liệu chờ nạp (Quan trọng)
+        }));
+
+        // Bước 3: Khôi phục selection (Mặc định chọn layer trên cùng)
+        if (this.layers.length > 0) {
+            this.selectedId = this.layers[this.layers.length - 1].id;
+        } else {
+            this.selectedId = null;
+        }
+    },
   }
 });
