@@ -1,97 +1,104 @@
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Vue](https://img.shields.io/badge/Vue-3-green.svg)
-![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
-![rembg](https://img.shields.io/badge/rembg-python-blue.svg)
-
 # Vue.NET ImageStudio
 
-**Vue.NET ImageStudio** là dự án web chỉnh sửa ảnh đơn giản, gồm 2 chức năng nổi bật:
-- **RemoveBG**: Xóa nền ảnh tự động bằng AI.
-- **Paint**: Vẽ, xóa, nhập ảnh, xuất ảnh dễ dàng trên canvas.
+![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
+![Vue](https://img.shields.io/badge/Vue.js-3.x-green.svg?style=flat-square)
+![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat-square)
+![Fabric.js](https://img.shields.io/badge/Fabric.js-Canvas-yellow.svg?style=flat-square)
 
-Không yêu cầu đăng nhập. Giao diện trực quan, thao tác nhanh chóng.
+**Vue.NET ImageStudio** is a modern, web-based image editing application that combines the interactivity of **Vue 3**, the performance of **.NET 8**, and the power of **Python AI**.
 
----
-
-## 🚀 Chức năng chính
-
-### 1. RemoveBG
-- **Upload ảnh**: Kéo/thả hoặc chọn file ảnh (PNG/JPG).
-- **Xóa nền AI**: Gửi ảnh tới backend Python (rembg) qua API, trả về ảnh đã xóa nền.
-- **Xem trước & tải về**: Hiển thị kết quả, cho phép tải về ảnh đã xóa nền.
-
-### 2. Paint Tool
-- **Vẽ/xóa**: Tùy ý vẽ hoặc tẩy trên canvas.
-- **Nhập ảnh**: Thêm ảnh vào canvas, chỉnh sửa, vẽ/xóa lớp trên ảnh.
-- **Xuất ảnh**: Lưu file ảnh đã chỉnh sửa về máy.
+The project aims to provide a seamless editing experience directly in the browser, featuring AI-powered background removal and essential canvas tools, with plans for cloud integration and advanced image adjustments.
 
 ---
 
-## ⚙️ Công nghệ sử dụng
+## Key Features
 
-| Thành phần    | Công nghệ                  |
-|---------------|---------------------------|
-| **Frontend**  | Vue 3, Vite, TailwindCSS  |
-| **Backend**   | .NET 8.0 WebAPI, Python   |
-| **Image AI**  | rembg (Python)            |
+### Current Features
+* **AI Background Removal:** Automatically remove image backgrounds with high precision using Python (`rembg`) integrated via API.
+* **Paint & Canvas Tools:**
+    * **Draw & Erase:** Freehand drawing and erasing capabilities on the canvas.
+    * **Layering:** Import multiple images, stack them, and manipulate specific layers.
+    * **Export:** Save your creative work instantly to your local device.
+* **Drag & Drop:** Intuitive interface supporting drag-and-drop for image uploads (PNG/JPG).
+
+### Roadmap (Upcoming Features)
+* [ ] **Advanced Image Adjustments:** Modify Hue, Contrast, Brightness, and Saturation for specific object layers.
+* [ ] **User Authentication:** Secure login/signup system.
+* [ ] **Cloud Integration:** Save and load project files directly to **Google Drive**.
+* [ ] **Project Management:** Save current workspace state (layers, history) to continue editing later.
 
 ---
 
-## ⬇️ Hướng dẫn khởi động dự án
+## Tech Stack
 
-### 1. Clone & Cài đặt
+| Component | Technology |
+| :--- | :--- |
+| **Frontend** | Vue 3, Vite, TailwindCSS |
+| **Backend** | .NET 8.0 Web API |
+| **AI Service** | Python, rembg, Uvicorn |
+| **Tooling** | Concurrently (for unified execution) |
+
+---
+
+## Getting Started
+
+Follow these steps to set up and run the project locally.
+
+### 1. Prerequisites
+Ensure you have the following installed:
+* **Node.js** (Latest LTS)
+* **.NET SDK 8.0** or higher
+* **Python 3.10** or higher
+
+### 2. Installation
+
+Clone the repository and install dependencies:
+
 ```bash
+# Clone the project
 git clone https://github.com/duyphan1410/Vue.NET-ImageStudio.git
 cd Vue.NET-ImageStudio
-```
 
-### 2. Chạy đồng thời 3 terminal
-
-**Terminal 1: Frontend**
-```bash
-cd frontend
+# Install Frontend dependencies (Root/Frontend)
 npm install
-npm run dev
-```
 
-**Terminal 2: Backend API (.NET)**
-```bash
-cd BackendApi
-dotnet restore
-dotnet run
-```
-
-**Terminal 3: Python Scripts (rembg)**
-```bash
+# Install Python dependencies
 cd BackendApi/PythonScripts
 pip install -r requirements.txt
-uvicorn remove_bg:app --host 0.0.0.0 --port 8000
+cd ../..
+
 ```
+Note: .NET dependencies will be restored automatically upon build
 
-Sau đó truy cập frontend qua địa chỉ: [http://localhost:5173](http://localhost:5173)
+## 3. Running the Application
+I have configured Concurrently to run the Frontend, Backend, and AI Service with a single command. No need to open multiple terminals!
 
----
-
-## 💡 Lưu ý
-
-- Yêu cầu đã cài đặt: NodeJS, .NET SDK 8+, Python 3.10+.
-- Nếu dùng Windows, kiểm tra đường dẫn phân cách (`\` hoặc `/`).
-- Các service cần chạy song song để frontend kết nối được các API.
-
----
-
-## 📝 License
-MIT License. Xem chi tiết tại [LICENSE](LICENSE).
+Simply run:
+```bash
+npm run dev
+```
+This command will launch:
+- Vue Frontend: http://localhost:5173
+- .NET Backend: (Port configured in launchSettings)
+- Python AI Service: http://0.0.0.0:8000
 
 ---
 
-## 📢 Credits
+## Notes
+
+- **Windows Users**: Ensure your path separators (`\` or `/`) are handled correctly if you encounter issues.
+- **Python Path**: Make sure `python` or `pip` is added to your system's Environment Variables.
+
+---
+
+## License
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+
+---
+
+## Credits
 - [Vue.js](https://vuejs.org/)
+- [Fabric.js](https://fabricjs.com/)
 - [.NET](https://dotnet.microsoft.com/)
-- [rembg](https://github.com/danielgatis/rembg)
-
----
-
-## 🙋‍♂️ Tác giả
-**Phan Duy**  
-GitHub: [@duyphan1410](https://github.com/duyphan1410)
+- [rembg](https://github.com/danielgatis/rembg) for the amazing background removal library.
