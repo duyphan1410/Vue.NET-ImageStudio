@@ -8,7 +8,7 @@
           v-for="tool in drawingTools" 
           :key="tool.id"
           :class="['tool-btn', { active: store.activeTool === tool.id }]"
-          @click="store.setTool(tool.id)"
+          @click="handleToolClick(tool.id)"
           :title="tool.label"
         >
           <span class="tool-icon">{{ tool.icon }}</span>
@@ -24,7 +24,7 @@
           v-for="tool in shapeTools" 
           :key="tool.id"
           :class="['tool-btn', { active: store.activeTool === tool.id }]"
-          @click="store.setTool(tool.id)"
+          @click="handleToolClick(tool.id)"
           :title="tool.label"
         >
           <span class="tool-icon">{{ tool.icon }}</span>
@@ -83,18 +83,58 @@
         </button>
       </div>
     </div>
+    <input 
+      type="file" 
+      ref="fileInputRef" 
+      accept="image/*"
+      style="display: none" 
+      @change="handleFileChange"
+    />
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import { useCanvasStore } from '@/stores/canvasStore';
 
 const store = useCanvasStore();
+const fileInputRef = ref(null);
+
+// 1. Kích hoạt input ẩn
+const triggerFileInput = () => {
+  fileInputRef.value.click();
+};
+
+// 2. Xử lý khi user chọn file
+const handleFileChange = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validate nhanh
+  if (!file.type.match('image.*')) {
+    alert('Vui lòng chọn file ảnh!');
+    return;
+  }
+
+  // Gọi action trong store
+  await store.addImage(file);
+  
+  event.target.value = '';
+};
+
+const handleToolClick = (toolId) => {
+  if (toolId === 'image') {
+    triggerFileInput();
+  } else {
+    store.setTool(toolId);
+  }
+};
 
 const drawingTools = [
   { id: 'select', icon: '🖱️', label: 'Select (V)' },
   { id: 'brush', icon: '🖌️', label: 'Brush (B)' },
   { id: 'eraser', icon: '🧹', label: 'Eraser (E)' },
+  { id: 'image', icon: '🖼️', label: 'Add Image (I)' },
 ];
 
 const shapeTools = [

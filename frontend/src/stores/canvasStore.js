@@ -1,8 +1,9 @@
 // stores/canvasStore.js
 import { defineStore } from 'pinia';
-import { markRaw } from 'vue'; // Bỏ toRaw không cần thiết
+import { markRaw } from 'vue'; 
 import { LayerService } from '@/services/LayerService';
 import { ToolService } from '@/services/ToolService';
+import { ImageService } from '@/services/ImageService';
 
 export const useCanvasStore = defineStore('canvas', {
   state: () => ({
@@ -32,10 +33,10 @@ export const useCanvasStore = defineStore('canvas', {
       if (this.layers.length === 0) {
         this.addLayer('Layer 1');
       }
-      this.saveState();
     },
 
-    addLayer(name = 'New Layer') {
+    addLayer(name = 'New Layer', options = {}) {
+      const { skipHistory = false } = options;
       const newId = `layer_${Date.now()}`;
       this.layers.push({
         id: newId,
@@ -48,6 +49,39 @@ export const useCanvasStore = defineStore('canvas', {
       this.selectedId = newId; 
 
       this.updateLayerInteractions();
+      if (!skipHistory) {
+        this.saveState();
+      }
+    },
+
+    async addImage(file) {
+      const activeLayer = this.layers.find(l => l.id === this.selectedId);
+
+      if (!activeLayer || !activeLayer.fabric) {
+        alert('Vui lòng chọn một layer để thêm ảnh!');
+        return;
+      }
+
+      const canvas = activeLayer.fabric;
+
+      const img = await ImageService.createImageObject(file, canvas);
+
+      canvas.add(img);
+      canvas.setActiveObject(img);
+
+      this.setTool('select');
+      
+      activeLayer.fabric.requestRenderAll();
+      this.triggerUpdateThumbnail(activeLayer.id);
+      this.saveState();
+    },
+
+
+    toggleLayerVisibility(id) {
+      const layer = this.layers.find(l => l.id === id);
+      if (!layer) return;
+
+      layer.visible = !layer.visible;
       this.saveState();
     },
 
@@ -104,17 +138,6 @@ export const useCanvasStore = defineStore('canvas', {
 
       // Cập nhật quyền tương tác
       this.updateLayerInteractions();
-
-      // if (layer.clonedData) {
-      //       console.log(`[Duplicate] Loading data for ${layerId}`);
-      //       // Gọi Service nạp dữ liệu vào
-      //       LayerService.loadFromJSON(fabricCanvas, layer.clonedData).then(() => {
-      //           // Nạp xong thì xóa data tạm đi cho nhẹ
-      //           delete layer.clonedData;
-      //           // Update lại thumbnail cho layer mới
-      //           this.triggerUpdateThumbnail(layerId);
-      //       });
-      // }
 
       // NẠP DỮ LIỆU TỪ LỊCH SỬ HOẶC DUPLICATE
       const dataToLoad = layer.clonedData || layer.pendingData;
@@ -416,7 +439,7 @@ export const useCanvasStore = defineStore('canvas', {
         }
 
         // Tạo Snapshot
-        const snapshot = LayerService.exportProjectState(this.layers);
+        const snapshot = LayerService.exportProjectState(this.layers,this.selectedId);
         
         // Đẩy vào stack
         this.historyStack.push(snapshot);
@@ -461,7 +484,7 @@ export const useCanvasStore = defineStore('canvas', {
 
         // Bước 2: Gán dữ liệu mới vào State
         // Vue sẽ tự động render lại <canvas> nhờ v-for
-        this.layers = snapshot.map(item => ({
+        this.layers = snapshot.layers.map(item => ({
             id: item.id,
             name: item.name,
             visible: item.visible,
@@ -472,7 +495,9 @@ export const useCanvasStore = defineStore('canvas', {
 
         // Bước 3: Khôi phục selection (Mặc định chọn layer trên cùng)
         if (this.layers.length > 0) {
-            this.selectedId = this.layers[this.layers.length - 1].id;
+            this.selectedId = snapshot.selectedId || (
+              this.layers.length ? this.layers[this.layers.length - 1].id : null
+            );
         } else {
             this.selectedId = null;
         }

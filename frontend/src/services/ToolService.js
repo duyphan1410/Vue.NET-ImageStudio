@@ -128,10 +128,6 @@ export const ToolService = {
     console.log('[ToolService] All tools reset for canvas');
   },
 
-  // ============================================================
-  // INTERNAL HANDLERS
-  // ============================================================
-
   _onShapeDown(canvas, o, type, color, size) {
     const pointer = canvas.getPointer(o.e);
     isDrawingShape = true;

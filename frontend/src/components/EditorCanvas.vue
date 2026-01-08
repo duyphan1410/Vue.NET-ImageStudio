@@ -7,6 +7,8 @@
           v-for="(layer, index) in store.layers"
           :key="layer.id"
           class="layer-wrapper"
+          @dragover.prevent
+          @drop="handleDrop"
           :style="{ 
             zIndex: index,
             pointerEvents: layer.id === store.selectedId ? 'auto' : 'none',
@@ -78,6 +80,20 @@ function handleCanvasRef(layerId, el, index) {
   
   store.registerLayerCanvas(layerId, el);
 }
+
+const handleDragOver = (e) => {
+  e.preventDefault();
+};
+
+const handleDrop = async (e) => {
+  e.preventDefault();
+
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+
+  await store.addImage(file);
+};
+
 </script>
 
 <style scoped>

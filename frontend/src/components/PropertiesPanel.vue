@@ -39,7 +39,7 @@
         >
           <button 
             class="visibility-btn" 
-            @click.stop="layer.visible = !layer.visible"
+            @click.stop="store.toggleLayerVisibility(layer.id)"
             :title="layer.visible ? 'Hide layer' : 'Show layer'"
           >
             {{ layer.visible ? '👁️' : '👁️‍🗨️' }}
