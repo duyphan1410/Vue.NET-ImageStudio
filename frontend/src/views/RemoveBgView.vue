@@ -1,46 +1,44 @@
 <script setup>
-import { ref } from "vue";
-import api from "../services/api";
+import { ref, onMounted, onUnmounted, watch } from "vue";
+import { useRemoveBg } from '@/composables/useRemoveBg';
+import { useWorkspaceStore } from "@/stores/workspaceStore"; 
 
-const selectedFile = ref(null);
-const originalImage = ref(null);
-const resultImage = ref(null);
-const isLoading = ref(false);
-const error = ref(null);
+const {
+  originalImage,
+  resultImage,
+  isLoading,
+  error,
+  processFile,
+  removeBg,
+  reset
+} = useRemoveBg()
+
+const workspaceStore = useWorkspaceStore();
+
 const isDragging = ref(false);
 const uploadRef = ref(null);
 
-const onFileChange = (e) => {
-  const file = e.target.files[0];
-  if (file) processFile(file);
+function onFileChange(e) {
+  const file = e.target.files[0]
+  if (file) processFile(file)
+}
+
+const registerWorkspace = () => {
+    workspaceStore.setWorkspace('remove-bg', () => {
+        return {
+            resultImage: resultImage.value // Chỉ cần trả về ảnh kết quả
+        };
+    });
 };
 
-const processFile = (file) => {
-  // Validate file type
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  if (!validTypes.includes(file.type)) {
-    error.value = "Please select a valid image file (JPEG, PNG, WebP)";
-    return;
-  }
+onMounted(() => {
+    registerWorkspace();
+});
 
-  // Validate file size (max 10MB)
-  if (file.size > 10 * 1024 * 1024) {
-    error.value = "File size must be less than 10MB";
-    return;
-  }
 
-  selectedFile.value = file;
-  
-  // Show preview
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    originalImage.value = e.target.result;
-  };
-  reader.readAsDataURL(file);
-  
-  resultImage.value = null;
-  error.value = null;
-};
+onUnmounted(() => {
+    workspaceStore.clearWorkspace();
+});
 
 const handleFileDrop = (e) => {
   e.preventDefault();
@@ -52,46 +50,43 @@ const handleFileDrop = (e) => {
 const triggerFileInput = () => {
   uploadRef.value?.click();
 };
+//     error.value = "Please select a file first";
+//     return;
+//   }
 
-const uploadFile = async () => {
-  if (!selectedFile.value) {
-    error.value = "Please select a file first";
-    return;
-  }
+//   isLoading.value = true;
+//   error.value = null;
 
-  isLoading.value = true;
-  error.value = null;
-
-  try {
-    const formData = new FormData();
-    formData.append("file", selectedFile.value);
+//   try {
+//     const formData = new FormData();
+//     formData.append("file", selectedFile.value);
     
-    const res = await api.post("api/image/remove-bg", formData, {
-      headers: { 
-        "Content-Type": "multipart/form-data" 
-      },
-      timeout: 60000
-    });
+//     const res = await api.post("api/image/remove-bg", formData, {
+//       headers: { 
+//         "Content-Type": "multipart/form-data" 
+//       },
+//       timeout: 60000
+//     });
 
-    if (res.data && res.data.image) {
-      resultImage.value = "data:image/png;base64," + res.data.image;
-    } else {
-      error.value = "Invalid response from server";
-    }
-  } catch (err) {
-    console.error("Upload error:", err);
+//     if (res.data && res.data.image) {
+//       resultImage.value = "data:image/png;base64," + res.data.image;
+//     } else {
+//       error.value = "Invalid response from server";
+//     }
+//   } catch (err) {
+//     console.error("Upload error:", err);
     
-    if (err.response) {
-      error.value = err.response.data?.error || `Server error: ${err.response.status}`;
-    } else if (err.request) {
-      error.value = "No response from server. Please check your connection.";
-    } else {
-      error.value = "An unexpected error occurred";
-    }
-  } finally {
-    isLoading.value = false;
-  }
-};
+//     if (err.response) {
+//       error.value = err.response.data?.error || `Server error: ${err.response.status}`;
+//     } else if (err.request) {
+//       error.value = "No response from server. Please check your connection.";
+//     } else {
+//       error.value = "An unexpected error occurred";
+//     }
+//   } finally {
+//     isLoading.value = false;
+//   }
+// };
 
 const downloadResult = () => {
   if (!resultImage.value) return;
@@ -101,12 +96,6 @@ const downloadResult = () => {
   link.click();
 };
 
-const reset = () => {
-  selectedFile.value = null;
-  originalImage.value = null;
-  resultImage.value = null;
-  error.value = null;
-};
 </script>
 
 <template>
@@ -125,14 +114,6 @@ const reset = () => {
         >
           <span class="icon">🔄</span>
           Reset
-        </button>
-        <button 
-          class="primary-btn"
-          :disabled="!resultImage"
-          @click="downloadResult"
-        >
-          <span class="icon">💾</span>
-          Download
         </button>
       </div>
     </div>
@@ -187,7 +168,7 @@ const reset = () => {
           <button 
             v-if="!resultImage && !isLoading"
             class="process-btn"
-            @click="uploadFile"
+            @click="removeBg"
           >
             <span class="arrow">→</span>
             <span class="text">Process</span>

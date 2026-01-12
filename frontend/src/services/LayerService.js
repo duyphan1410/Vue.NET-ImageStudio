@@ -40,15 +40,6 @@ export const LayerService = {
     // Load data vào canvas mới
     await fabricInstance.loadFromJSON(json);
 
-    // Logic Offset: Dịch chuyển các object một chút để người dùng biết là đã duplicate
-    // fabricInstance.getObjects().forEach(obj => {
-    //   obj.set({
-    //     left: (obj.left || 0) + 20, // Dịch sang phải 20px
-    //     top: (obj.top || 0) + 20,   // Dịch xuống dưới 20px
-    //   });
-    //   obj.setCoords(); // Cập nhật lại tọa độ click
-    // });
-
     fabricInstance.requestRenderAll();
   },
 

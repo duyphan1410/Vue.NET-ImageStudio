@@ -1,38 +1,23 @@
 <template>
   <div class="toolbar">
-    <!-- Drawing Tools -->
-    <div class="toolbar-section">
-      <div class="section-label">Tools</div>
-      <div class="tool-group">
-        <button 
-          v-for="tool in drawingTools" 
-          :key="tool.id"
-          :class="['tool-btn', { active: store.activeTool === tool.id }]"
-          @click="handleToolClick(tool.id)"
-          :title="tool.label"
-        >
-          <span class="tool-icon">{{ tool.icon }}</span>
-        </button>
+    <template v-for="section in toolSections" :key="section.id">
+      <div class="toolbar-section">
+        <div class="section-label">{{ section.label }}</div>
+        <div class="tool-group">
+          <button 
+            v-for="item in section.items"
+            :key="item.id"
+            :class="['tool-btn', { active: isToolActive(item.id) }]"
+            :disabled="item.disabled"
+            @click="handleItemClick(item)"
+            :title="item.label"
+          >
+            <component :is="item.icon" :size="20" stroke-width="1.5" />
+          </button>
+        </div>
       </div>
-    </div>
+    </template>
 
-    <!-- Shape Tools -->
-    <div class="toolbar-section">
-      <div class="section-label">Shapes</div>
-      <div class="tool-group">
-        <button 
-          v-for="tool in shapeTools" 
-          :key="tool.id"
-          :class="['tool-btn', { active: store.activeTool === tool.id }]"
-          @click="handleToolClick(tool.id)"
-          :title="tool.label"
-        >
-          <span class="tool-icon">{{ tool.icon }}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Color Picker -->
     <div class="toolbar-section">
       <div class="section-label">Color</div>
       <div class="color-picker-wrapper">
@@ -45,44 +30,35 @@
       </div>
     </div>
 
-    <!-- Brush Size -->
-    <div class="toolbar-section" v-if="['brush', 'eraser', 'rectangle', 'circle'].includes(store.activeTool)">
+    <div class="toolbar-section" v-if="showSizeControl">
       <div class="section-label">Size</div>
+      
       <div class="slider-control">
-        <input 
-          type="range" 
-          :value="store.brushSize" 
-          @input="e => store.updateBrushSettings(Number(e.target.value), store.brushColor)"
-          min="1" 
-          max="50"
-          class="size-slider"
-        />
-        <span class="size-value">{{ store.brushSize }}px</span>
+        <div class="brush-preview-box">
+          <div 
+            class="brush-preview-circle"
+            :style="{ 
+              width: store.brushSize + 'px', 
+              height: store.brushSize + 'px',
+              backgroundColor: store.brushColor 
+            }"
+          ></div>
+        </div>
+
+        <div class="range-wrapper">
+          <input 
+            type="range" 
+            :value="store.brushSize" 
+            @input="e => store.updateBrushSettings(Number(e.target.value), store.brushColor)"
+            min="1" max="50"
+            class="custom-range"
+          />
+        </div>
+
+        <span class="size-badge">{{ store.brushSize }} px</span>
       </div>
     </div>
 
-    <!-- History Controls -->
-    <div class="toolbar-section">
-      <div class="section-label">History</div>
-      <div class="tool-group">
-        <button 
-          class="tool-btn"
-          @click="store.undo()" 
-          :disabled="store.historyIndex <= 0"
-          title="Undo (Ctrl+Z)"
-        >
-          <span class="tool-icon">↩️</span>
-        </button>
-        <button 
-          class="tool-btn"
-          @click="store.redo()" 
-          :disabled="store.historyIndex >= store.historyStack.length - 1"
-          title="Redo (Ctrl+Y)"
-        >
-          <span class="tool-icon">↪️</span>
-        </button>
-      </div>
-    </div>
     <input 
       type="file" 
       ref="fileInputRef" 
@@ -94,209 +70,293 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { 
+  MousePointer2, Brush, Eraser, Image as ImageIcon, 
+  Square, Circle, Undo2, Redo2 
+} from 'lucide-vue-next';
 
 const store = useCanvasStore();
 const fileInputRef = ref(null);
 
-// 1. Kích hoạt input ẩn
-const triggerFileInput = () => {
-  fileInputRef.value.click();
+// --- 1. CONFIG DATA (Linh động toàn bộ ở đây) ---
+// Dùng computed để trạng thái disabled của Undo/Redo tự cập nhật
+const toolSections = computed(() => [
+  {
+    id: 'drawing',
+    label: 'Tools',
+    items: [
+      { id: 'select', icon: MousePointer2, label: 'Select (V)', type: 'tool' },
+      { id: 'brush', icon: Brush, label: 'Brush (B)', type: 'tool' },
+      { id: 'eraser', icon: Eraser, label: 'Eraser (E)', type: 'tool' },
+      { id: 'image', icon: ImageIcon, label: 'Add Image (I)', type: 'action', action: triggerFileInput },
+    ]
+  },
+  {
+    id: 'shapes',
+    label: 'Shapes',
+    items: [
+      { id: 'rectangle', icon: Square, label: 'Rectangle (R)', type: 'tool' },
+      { id: 'circle', icon: Circle, label: 'Circle (C)', type: 'tool' },
+    ]
+  },
+  {
+    id: 'history',
+    label: 'History',
+    items: [
+      { 
+        id: 'undo', icon: Undo2, label: 'Undo (Ctrl+Z)', type: 'action', 
+        action: () => store.undo(), 
+        disabled: store.historyIndex <= 0 
+      },
+      { 
+        id: 'redo', icon: Redo2, label: 'Redo (Ctrl+Y)', type: 'action', 
+        action: () => store.redo(), 
+        disabled: store.historyIndex >= store.historyStack.length - 1 
+      },
+    ]
+  }
+]);
+
+// --- 2. LOGIC XỬ LÝ ---
+
+// Kiểm tra tool nào đang active để tô màu nút
+const isToolActive = (id) => store.activeTool === id;
+
+// Kiểm tra khi nào hiện thanh trượt Size
+const showSizeControl = computed(() => 
+  ['brush', 'eraser', 'rectangle', 'circle'].includes(store.activeTool)
+);
+
+// Hàm xử lý click chung cho mọi nút
+const handleItemClick = (item) => {
+  if (item.type === 'tool') {
+    store.setTool(item.id);
+  } else if (item.type === 'action' && item.action) {
+    item.action();
+  }
 };
 
-// 2. Xử lý khi user chọn file
+// Logic upload ảnh
+const triggerFileInput = () => fileInputRef.value.click();
+
 const handleFileChange = async (event) => {
   const file = event.target.files[0];
-  if (!file) return;
-
-  // Validate nhanh
-  if (!file.type.match('image.*')) {
-    alert('Vui lòng chọn file ảnh!');
-    return;
+  if (file && file.type.match('image.*')) {
+    await store.addImage(file);
   }
-
-  // Gọi action trong store
-  await store.addImage(file);
-  
   event.target.value = '';
 };
-
-const handleToolClick = (toolId) => {
-  if (toolId === 'image') {
-    triggerFileInput();
-  } else {
-    store.setTool(toolId);
-  }
-};
-
-const drawingTools = [
-  { id: 'select', icon: '🖱️', label: 'Select (V)' },
-  { id: 'brush', icon: '🖌️', label: 'Brush (B)' },
-  { id: 'eraser', icon: '🧹', label: 'Eraser (E)' },
-  { id: 'image', icon: '🖼️', label: 'Add Image (I)' },
-];
-
-const shapeTools = [
-  { id: 'rectangle', icon: '▭', label: 'Rectangle (R)' },
-  { id: 'circle', icon: '⭕', label: 'Circle (C)' },
-];
 </script>
 
 <style scoped>
+/* 1. KHUNG CHÍNH TOOLBAR */
 .toolbar {
-  width: 72px;
-  background: #252525;
-  border-right: 1px solid #1a1a1a;
+  width: 68px; 
+  background: #1e1e1e; /* Màu nền tối hơn chút cho giống các app đồ họa xịn */
+  border-right: 1px solid #333;
   display: flex;
   flex-direction: column;
-  padding: 8px 0;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
-  overflow-y: auto;
+  padding: 12px 0;
+  gap: 8px;
+  height: 100%;
+  overflow-y: auto; /* Cho phép cuộn nếu màn hình thấp */
   overflow-x: hidden;
-  height: 100%; /* Quan trọng: chiếm full height */
-  flex-shrink: 0; /* Không cho shrink */
+  align-items: center; /* QUAN TRỌNG: Căn giữa tất cả mọi thứ */
 }
 
+/* 2. CÁC PHẦN SECTION */
 .toolbar-section {
-  padding: 1px 8px 8px 8px;
-  border-bottom: 1px solid #1a1a1a;
-  flex-shrink: 0; /* Giữ nguyên kích thước */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a; /* Đường kẻ mờ hơn */
+}
+
+.toolbar-section:last-child {
+  border-bottom: none;
 }
 
 .section-label {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 9px; /* Nhỏ lại chút cho tinh tế */
+  font-weight: 700;
   text-transform: uppercase;
-  color: #888;
-  margin-bottom: 8px;
+  color: #666;
+  margin-bottom: 6px;
   text-align: center;
   letter-spacing: 0.5px;
 }
 
+/* 3. NHÓM NÚT BẤM */
 .tool-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px; /* Khoảng cách giữa các nút */
+  width: 100%;
+  align-items: center;
 }
 
 .tool-btn {
-  width: 56px;
-  height: 48px;
-  background: #2d2d2d;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
+  width: 40px;  /* Giảm xuống 40px nhìn sẽ gọn gàng hơn */
+  height: 40px;
+  background: #2a2a2a; /* Màu nền nút nhạt hơn nền toolbar chút */
+  border: 1px solid transparent; /* Viền ẩn */
+  border-radius: 6px; /* Bo góc mềm mại hơn */
   cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #a0a0a0;
   position: relative;
-  flex-shrink: 0;
 }
 
+/* Hover effect */
 .tool-btn:hover:not(:disabled) {
   background: #3a3a3a;
-  border-color: #4a4a4a;
-  transform: translateY(-1px);
+  color: #fff;
+  transform: translateY(-1px); /* Nhấc nhẹ nút lên */
 }
 
+/* Active effect */
 .tool-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: #667eea;
-  box-shadow: 0 0 12px rgba(102, 126, 234, 0.4);
+  background: #667eea; /* Màu tím chủ đạo */
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); /* Bóng đổ tím */
 }
 
 .tool-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-}
-
-.tool-icon {
-  font-size: 22px;
-}
-
-/* Color Picker */
-.color-picker-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.color-input {
-  width: 56px;
-  height: 48px;
-  border: 2px solid #3a3a3a;
-  border-radius: 6px;
-  cursor: pointer;
   background: transparent;
 }
 
-.color-input::-webkit-color-swatch-wrapper {
-  padding: 4px;
+/* 4. COLOR PICKER */
+.color-picker-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%; /* Hình tròn cho đẹp */
+  overflow: hidden;
+  border: 2px solid #3a3a3a;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
 
-.color-input::-webkit-color-swatch {
+.color-picker-wrapper:hover {
+  transform: scale(1.1);
+  border-color: #fff;
+}
+
+.color-input {
+  width: 150%; /* Hack để che cái icon mặc định của input color */
+  height: 150%;
+  margin: -25%;
+  cursor: pointer;
   border: none;
-  border-radius: 4px;
+  padding: 0;
 }
 
-/* Slider Control */
 .slider-control {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
 }
 
-.size-slider {
-  width: 56px;
+/* 1. Phần xem trước kích thước (Preview Box) */
+.brush-preview-box {
+  width: 44px; 
+  height: 44px;
+  border: 1px dashed #444; /* Viền đứt nét để định hình khung */
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1e1e; /* Màu nền tối hơn toolbar chút */
+  margin-bottom: 4px;
+}
+
+.brush-preview-circle {
+  border-radius: 50%;
+  box-shadow: 0 0 2px rgba(255,255,255,0.2); /* Bóng nhẹ cho dễ nhìn nếu màu đen */
+  transition: all 0.1s ease; /* Hiệu ứng mượt khi kéo */
+}
+
+/* 2. Style thanh trượt (Custom Range Input) */
+.range-wrapper {
+  width: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+.custom-range {
+  -webkit-appearance: none; /* Tắt giao diện mặc định */
+  width: 100%;
   height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: #3a3a3a;
+  background: #444;
   border-radius: 2px;
   outline: none;
+  cursor: pointer;
 }
 
-.size-slider::-webkit-slider-thumb {
+/* Style cho cục trượt (Thumb) - Webkit (Chrome/Edge/Safari) */
+.custom-range::-webkit-slider-thumb {
   -webkit-appearance: none;
-  appearance: none;
   width: 14px;
   height: 14px;
-  background: #667eea;
   border-radius: 50%;
+  background: #fff; /* Màu trắng nổi bật */
+  border: 2px solid #667eea; /* Viền tím */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  margin-top: -4.5px; /* Căn giữa theo chiều dọc */
+  transition: transform 0.1s;
+}
+
+.custom-range:active::-webkit-slider-thumb {
+  transform: scale(1.2); /* Phóng to nhẹ khi đang kéo */
+  background: #667eea;
+}
+
+/* Style cho cục trượt (Thumb) - Firefox */
+.custom-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #667eea;
+  border-radius: 50%;
+  background: #fff;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
-.size-slider::-webkit-slider-thumb:hover {
-  background: #764ba2;
-  transform: scale(1.2);
+.size-badge {
+  font-size: 10px;
+  color: #888;
+  background: #1a1a1a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #333;
+  min-width: 32px;
+  text-align: center;
 }
 
-.size-value {
-  font-size: 11px;
-  color: #aaa;
-  font-weight: 500;
-}
-
-/* Scrollbar */
+/* Scrollbar tinh tế */
 .toolbar::-webkit-scrollbar {
   width: 4px;
 }
 
 .toolbar::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: transparent;
 }
 
 .toolbar::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
-  border-radius: 2px;
+  background: #444;
+  border-radius: 4px;
 }
 
 .toolbar::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: #555;
 }
 </style>

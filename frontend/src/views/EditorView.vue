@@ -9,15 +9,18 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, nextTick  } from 'vue';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useWorkspaceStore} from '@/stores/workspaceStore';
 import Toolbar from '@/components/Toolbar.vue';
 import EditorCanvas from '@/components/EditorCanvas.vue';
 import PropertiesPanel from '@/components/PropertiesPanel.vue';
 
 const store = useCanvasStore();
 
-// --- HÀM XỬ LÝ PHÍM TẮT ---
+const workspaceStore = useWorkspaceStore()
+
+// Xử lý phím tắt
 const handleKeyboard = (e) => {
   // Kiểm tra Ctrl (Window) hoặc Command (Mac) + Z
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -33,11 +36,42 @@ const handleKeyboard = (e) => {
   }
 };
 
-onMounted(() => {
+// Khi bấm nút Export trên Header
+
+onMounted(async () => {
+
+  await nextTick()
+
   store.initFirstLayer();
 
   // Đăng ký sự kiện phím tắt
   window.addEventListener('keydown', handleKeyboard);
+
+  if (!store.width || !store.height) {
+      console.error('Invalid canvas dimensions')
+      return
+  }
+  console.log('[Editor] Setting workspace:', {
+    layers: store.layers.length,
+    width: store.width,
+    height: store.height
+  })
+
+  workspaceStore.setWorkspace('editor', () => {
+    return {
+      layers: store.layers.map(layer => ({
+        id: layer.id,
+        name: layer.name,
+        visible: layer.visible,
+        fabric: layer.fabric, // Truyền luôn fabric instance
+        canvasEl: layer.canvasEl // Backup nếu cần
+      })),
+      width: store.width,
+      height: store.height,
+      dpi: store.dpi || 2
+    }
+  })
+  console.log('[Editor] Workspace set. Ready:', workspaceStore.ready)
 });
 
 onUnmounted(() => {
