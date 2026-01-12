@@ -50,51 +50,6 @@ const handleFileDrop = (e) => {
 const triggerFileInput = () => {
   uploadRef.value?.click();
 };
-//     error.value = "Please select a file first";
-//     return;
-//   }
-
-//   isLoading.value = true;
-//   error.value = null;
-
-//   try {
-//     const formData = new FormData();
-//     formData.append("file", selectedFile.value);
-    
-//     const res = await api.post("api/image/remove-bg", formData, {
-//       headers: { 
-//         "Content-Type": "multipart/form-data" 
-//       },
-//       timeout: 60000
-//     });
-
-//     if (res.data && res.data.image) {
-//       resultImage.value = "data:image/png;base64," + res.data.image;
-//     } else {
-//       error.value = "Invalid response from server";
-//     }
-//   } catch (err) {
-//     console.error("Upload error:", err);
-    
-//     if (err.response) {
-//       error.value = err.response.data?.error || `Server error: ${err.response.status}`;
-//     } else if (err.request) {
-//       error.value = "No response from server. Please check your connection.";
-//     } else {
-//       error.value = "An unexpected error occurred";
-//     }
-//   } finally {
-//     isLoading.value = false;
-//   }
-// };
-
-const downloadResult = () => {
-  if (!resultImage.value) return;
-  const link = document.createElement('a');
-  link.download = `removed_bg_${Date.now()}.png`;
-  link.href = resultImage.value;
-  link.click();
-};
 
 </script>
 
