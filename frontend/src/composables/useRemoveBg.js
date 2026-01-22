@@ -8,6 +8,9 @@ export function useRemoveBg() {
   const isLoading = ref(false)
   const error = ref(null)
 
+  const isEditing = ref(false);
+  const editedImage = ref(null);
+
   function processFile(file) {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp']
     if (!validTypes.includes(file.type)) {
@@ -46,11 +49,31 @@ export function useRemoveBg() {
     }
   }
 
+  const startEditing = () => {
+    if (resultImage.value) {
+      editedImage.value = resultImage.value;
+      isEditing.value = true;
+    }
+  };
+
+  // MỚI: Save edited image
+  const saveEdited = (dataUrl) => {
+    resultImage.value = dataUrl;
+    isEditing.value = false;
+  };
+
+  // MỚI: Cancel editing
+  const cancelEditing = () => {
+    isEditing.value = false;
+  };
+
   function reset() {
-    selectedFile.value = null
-    originalImage.value = null
-    resultImage.value = null
-    error.value = null
+    selectedFile.value = null;
+    originalImage.value = null;
+    resultImage.value = null;
+    error.value = null;
+    editedImage.value = null;
+    isEditing.value = false;
   }
 
   return {
@@ -61,6 +84,11 @@ export function useRemoveBg() {
     error,
     processFile,
     removeBg,
-    reset
+    reset,
+    isEditing,
+    editedImage,
+    startEditing,
+    saveEdited,
+    cancelEditing,
   }
 }

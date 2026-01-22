@@ -12,9 +12,9 @@
 import { onMounted, onUnmounted, nextTick  } from 'vue';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useWorkspaceStore} from '@/stores/workspaceStore';
-import Toolbar from '@/components/Toolbar.vue';
-import EditorCanvas from '@/components/EditorCanvas.vue';
-import PropertiesPanel from '@/components/PropertiesPanel.vue';
+import Toolbar from '@/components/Editor/Toolbar.vue';
+import EditorCanvas from '@/components/Editor/EditorCanvas.vue';
+import PropertiesPanel from '@/components/Editor/PropertiesPanel.vue';
 
 const store = useCanvasStore();
 

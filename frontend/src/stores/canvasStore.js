@@ -3,6 +3,8 @@ import { markRaw } from 'vue';
 import { LayerService } from '@/services/LayerService';
 import { ToolService } from '@/services/ToolService';
 import { ImageService } from '@/services/ImageService';
+import { SmartEraserService } from '@/services/SmartEraserService';
+import { Group, Path } from 'fabric';
 
 export const useCanvasStore = defineStore('canvas', {
   state: () => ({
@@ -79,6 +81,36 @@ export const useCanvasStore = defineStore('canvas', {
       this.saveState();
     },
 
+    async bakeSelectedObject() {
+      const layer = this.layers.find(l => l.id === this.selectedId);
+      if (!layer?.fabric) return;
+
+      const activeObj = layer.fabric.getActiveObject();
+      if (!activeObj) {
+        alert('Vui lòng chọn một object để bake!');
+        return;
+      }
+
+      await SmartEraserService.bakeObject(activeObj, layer.fabric);
+      this.triggerUpdateThumbnail(layer.id);
+      this.saveState();
+    },
+
+    async bakeAllPathsInLayer(layerId) {
+      const layer = this.layers.find(l => l.id === layerId);
+      if (!layer?.fabric) return;
+
+      const objects = layer.fabric.getObjects().slice();
+
+      for (const obj of objects) {
+        if (obj.type === 'path' && !obj._isRasterized) {
+          await SmartEraserService.bakeObject(obj, layer.fabric);
+        }
+      }
+
+      this.triggerUpdateThumbnail(layerId);
+      this.saveState();
+    },
 
     toggleLayerVisibility(id) {
       const layer = this.layers.find(l => l.id === id);
@@ -88,7 +120,12 @@ export const useCanvasStore = defineStore('canvas', {
       this.saveState();
     },
 
-    registerLayerCanvas(layerId, el) {
+    async registerLayerCanvas(layerId, el) {
+      console.log('🧪 SmartEraserService check:', {
+        exists: !!SmartEraserService,
+        applyToLayers: typeof SmartEraserService?.applyToLayers
+      });
+
       const layer = this.layers.find(l => l.id === layerId);
       if (!layer) return;
 
@@ -122,22 +159,97 @@ export const useCanvasStore = defineStore('canvas', {
       layer.fabric = markRaw(fabricCanvas);
       layer.canvasEl = el;
 
-      // Setup Events
-      fabricCanvas.on('path:created', (e) => {
+      fabricCanvas.on('path:created', async (e) => {
         if (this.activeTool === 'eraser') {
-          e.path.globalCompositeOperation = 'destination-out';
+          // 1. Lấy eraser path vừa vẽ
+          console.log('🔴 ERASER PATH CREATED');
+          this.isUndoing = true;
+          const eraserPath = e.path;
+
+          // const zoom = fabricCanvas.getZoom() || 1;
+          // eraserPath.strokeWidth = this.eraserSize / zoom;
+          // eraserPath.setCoords();
+
+
+          // eraserPath.set({
+          //   selectable: false,
+          //   evented: false,
+          //   erasable: false
+          // });
+          
+          // 2. Xóa path preview khỏi canvas hiện tại
+          const eraserGeometry = eraserPath.toObject(['path', 'strokeWidth', 'left', 'top', 'width', 'height', 'pathOffset']);
+
+          if (eraserGeometry.width === 0) eraserGeometry.width = 1;
+          if (eraserGeometry.height === 0) eraserGeometry.height = 1;
+
+          // remove path khỏi canvas
+          fabricCanvas.remove(eraserPath);
+          fabricCanvas.requestRenderAll();
+          console.log('✅ ERASER PATH REMOVED');
+
+          const activeLayer = this.layers.find(l => l.id === this.selectedId);
+
+          // Nếu không có layer active hoặc layer đó bị khóa/ẩn -> Dừng
+          if (!activeLayer || !activeLayer.visible || !activeLayer.fabric) {
+            console.warn('⚠️ No active layer to erase');
+            return;
+          }
+
+          // 3. Apply eraser cho TẤT CẢ layers visible
+          try {
+            // ✅ Apply SmartEraser với logic phân loại (CẦN await)
+            console.log('🔵 Starting SmartEraser.applyToLayers...');
+            console.log('   - eraserPath:', eraserGeometry);
+            console.log('   - layers count:', this.layers.length);
+
+            console.log('⏳ Eraser processing...');
+
+            // Vì Service mới là Async, ta phải await để đảm bảo xóa xong hết mới chạy tiếp
+            await SmartEraserService.applyToLayers(
+              eraserGeometry,
+              [activeLayer],
+              (targetLayerId) => this.triggerUpdateThumbnail(targetLayerId)
+            );
+
+            this.isUndoing = false;
+
+            console.log('✅ Eraser done.');
+            this.saveState();
+          } catch (error) {
+            console.error('❌ Eraser Failed:', error);
+            this.isUndoing = false;
+          }
+          return; // Không save state ở đây
         }
+
         this.triggerUpdateThumbnail(layerId);
-        this.saveState()
+        this.saveState();
       });
+
+      // fabricCanvas.on('mouse:up', () => {
+      //   if (this.activeTool !== 'eraser') return;
+
+      //   this.triggerUpdateThumbnail(layerId);
+      //   this.saveState();
+      // });
+
+
       fabricCanvas.on('object:modified', () => {
+        if (this.activeTool === 'eraser') return;
         this.triggerUpdateThumbnail(layerId);
         this.saveState()
       });
       fabricCanvas.on('object:removed', () => {
+        if (this.activeTool === 'eraser') return;
         this.triggerUpdateThumbnail(layerId);
         this.saveState()
       });
+
+      // fabricCanvas.on('object:added', () => {
+      //   // Tương tự, eraser add object mới -> ko save ở đây
+      //   if (this.activeTool === 'eraser') return;
+      // });
 
       // Cập nhật quyền tương tác
       this.updateLayerInteractions();
