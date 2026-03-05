@@ -51,11 +51,11 @@ onMounted(async () => {
       console.error('Invalid canvas dimensions')
       return
   }
-  console.log('[Editor] Setting workspace:', {
-    layers: store.layers.length,
-    width: store.width,
-    height: store.height
-  })
+  // console.log('[Editor] Setting workspace:', {
+  //   layers: store.layers.length,
+  //   width: store.width,
+  //   height: store.height
+  // })
 
   workspaceStore.setWorkspace('editor', () => {
     return {
@@ -71,7 +71,7 @@ onMounted(async () => {
       dpi: store.dpi || 2
     }
   })
-  console.log('[Editor] Workspace set. Ready:', workspaceStore.ready)
+  // console.log('[Editor] Workspace set. Ready:', workspaceStore.ready)
 });
 
 onUnmounted(() => {

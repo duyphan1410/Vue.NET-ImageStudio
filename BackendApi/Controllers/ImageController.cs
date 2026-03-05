@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 
 namespace BackendApi.Controllers
 {
@@ -12,9 +13,11 @@ namespace BackendApi.Controllers
         [JsonPropertyName("message")]
         public string? Message { get; set; }
     }
-    
+
     public class FileUploadModel
     {
+        [Required(ErrorMessage = "Vui lòng chọn một file ảnh.")]
+        [DataType(DataType.Upload)]
         public IFormFile? File { get; set; }
     }
 
@@ -24,13 +27,14 @@ namespace BackendApi.Controllers
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IWebHostEnvironment _env;
-        // Cập nhật Base URL để trỏ đúng đến API Python đang chạy trên cổng 8000
-        private const string PythonApiBaseUrl = "http://localhost:8000/";
+        
+        private readonly ILogger<ImageController> _logger;
 
-        public ImageController(IHttpClientFactory httpClientFactory, IWebHostEnvironment env)
+        public ImageController(IHttpClientFactory httpClientFactory, IWebHostEnvironment env, IConfiguration configuration, ILogger<ImageController> logger)
         {
             _httpClientFactory = httpClientFactory;
             _env = env;
+            _logger = logger;
         }
 
         [HttpPost("remove-bg")]
@@ -41,9 +45,7 @@ namespace BackendApi.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "No file uploaded." });
 
-            var client = _httpClientFactory.CreateClient();
-            // Thiết lập BaseAddress cho client từ hằng số đã định nghĩa
-            client.BaseAddress = new Uri(PythonApiBaseUrl);
+            var client = _httpClientFactory.CreateClient("PythonApiClient");
 
             // Gửi file trực tiếp đến API Python
             using var formData = new MultipartFormDataContent();
@@ -64,7 +66,7 @@ namespace BackendApi.Controllers
 
                 // Đọc và deserialize JSON response
                 var apiResponse = await response.Content.ReadFromJsonAsync<ImageApiResponse>();
-                
+
                 if (string.IsNullOrEmpty(apiResponse?.Base64Image))
                 {
                     return StatusCode(500, new { message = "Invalid response from Python API." });
@@ -74,8 +76,13 @@ namespace BackendApi.Controllers
             }
             catch (HttpRequestException ex)
             {
-                // Xử lý lỗi khi không thể kết nối đến API Python
-                return StatusCode(500, new { message = $"Failed to connect to Python API. Make sure it is running at {PythonApiBaseUrl}. Error: {ex.Message}" });
+                // Log lỗi chi tiết kèm URL để bạn (Dev) debug trong Console/File
+                _logger.LogError(ex, "Lỗi kết nối Python API.");
+
+                return StatusCode(500, new
+                {
+                    message = "Dịch vụ xử lý ảnh hiện không khả dụng. Vui lòng thử lại sau."
+                });
             }
             catch (Exception ex)
             {

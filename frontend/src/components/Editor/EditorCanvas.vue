@@ -71,15 +71,10 @@ function handleCanvasRef(layerId, el, index) {
   if (!el) return;
   
   const isSelected = layerId === store.selectedId;
-  const pointerEvents = isSelected ? 'auto' : 'none';
-  
-  console.log(`[Canvas Ref] ${layerId} (z-index: ${index})`);
-  console.log(`  - Selected: ${isSelected}`);
-  console.log(`  - pointer-events: ${pointerEvents}`);
-  console.log(`  - Element:`, el);
-  
+  const pointerEvents = isSelected ? 'auto' : 'none';  
   store.registerLayerCanvas(layerId, el);
 }
+
 
 const handleDragOver = (e) => {
   e.preventDefault();

@@ -24,7 +24,8 @@
         <input 
           type="color" 
           :value="store.brushColor" 
-          @input="e => store.updateBrushSettings(store.brushSize, e.target.value)"
+          @input="e => store.previewBrushColor(e.target.value)"
+          @change="e => store.commitBrushColor(e.target.value)"
           class="color-input"
         />
       </div>
@@ -49,13 +50,41 @@
           <input 
             type="range" 
             :value="store.brushSize" 
-            @input="e => store.updateBrushSettings(Number(e.target.value), store.brushColor)"
+            @input="e => store.previewBrushSize(Number(e.target.value))"
+            @change="e => store.commitBrushSize(Number(e.target.value))"
             min="1" max="50"
             class="custom-range"
           />
         </div>
 
-        <span class="size-badge">{{ store.brushSize }} px</span>
+        <span 
+          v-if="!showBrushSizeInput"
+          class="size-badge"
+          @click="toggleBrushSizeInput"
+        >{{ store.brushSize }} px</span>
+        <input 
+          v-else
+          type="number"
+          v-model.number="store.brushSize"
+          min="1" max="50"
+          class="property-input-dark"
+          @input="e => {
+            if (isNaN(val)) return; 
+            // Giới hạn ngay để vòng tròn preview không bị vỡ
+            val = Math.max(1, Math.min(50, val));
+            store.previewBrushSize(val);
+          }"
+          @change="e =>
+          {
+            let val = parseInt(e.target.value);
+            val = Math.max(1, Math.min(50, val));
+            store.commitBrushSize(val);
+            showBrushSizeInput = false;
+          }"
+          @blur="showBrushSizeInput = false"
+          @keyup.enter="e => e.target.blur()"
+          v-autofocus
+        />
       </div>
     </div>
 
@@ -79,6 +108,11 @@ import {
 
 const store = useCanvasStore();
 const fileInputRef = ref(null);
+const showBrushSizeInput = ref(false);
+
+const toggleBrushSizeInput = () => {
+  showBrushSizeInput.value = !showBrushSizeInput.value;
+};
 
 // --- 1. CONFIG DATA (Linh động toàn bộ ở đây) ---
 // Dùng computed để trạng thái disabled của Undo/Redo tự cập nhật
@@ -164,6 +198,7 @@ const handleFileChange = async (event) => {
   overflow-y: auto; /* Cho phép cuộn nếu màn hình thấp */
   overflow-x: hidden;
   align-items: center; /* QUAN TRỌNG: Căn giữa tất cả mọi thứ */
+  scrollbar-gutter: stable;
 }
 
 /* 2. CÁC PHẦN SECTION */
@@ -174,6 +209,7 @@ const handleFileChange = async (event) => {
   align-items: center;
   padding-bottom: 8px;
   border-bottom: 1px solid #2a2a2a; /* Đường kẻ mờ hơn */
+  min-height: auto;
 }
 
 .toolbar-section:last-child {
@@ -265,12 +301,13 @@ const handleFileChange = async (event) => {
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-height: 0;
 }
 
 /* 1. Phần xem trước kích thước (Preview Box) */
 .brush-preview-box {
-  width: 44px; 
-  height: 44px;
+  width: 54px; 
+  height: 54px;
   border: 1px dashed #444; /* Viền đứt nét để định hình khung */
   border-radius: 4px;
   display: flex;
@@ -278,12 +315,15 @@ const handleFileChange = async (event) => {
   justify-content: center;
   background: #1e1e1e; /* Màu nền tối hơn toolbar chút */
   margin-bottom: 4px;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .brush-preview-circle {
   border-radius: 50%;
   box-shadow: 0 0 2px rgba(255,255,255,0.2); /* Bóng nhẹ cho dễ nhìn nếu màu đen */
-  transition: all 0.1s ease; /* Hiệu ứng mượt khi kéo */
+  transition: transform 0.1s ease-out;
+  flex-shrink: 0;
 }
 
 /* 2. Style thanh trượt (Custom Range Input) */
@@ -297,7 +337,7 @@ const handleFileChange = async (event) => {
   -webkit-appearance: none; /* Tắt giao diện mặc định */
   width: 100%;
   height: 4px;
-  background: #444;
+  background: #3a3a3a;
   border-radius: 2px;
   outline: none;
   cursor: pointer;
@@ -312,7 +352,6 @@ const handleFileChange = async (event) => {
   background: #fff; /* Màu trắng nổi bật */
   border: 2px solid #667eea; /* Viền tím */
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  margin-top: -4.5px; /* Căn giữa theo chiều dọc */
   transition: transform 0.1s;
 }
 
@@ -329,6 +368,7 @@ const handleFileChange = async (event) => {
   border-radius: 50%;
   background: #fff;
   cursor: pointer;
+  transition: transform 0.1s;
 }
 
 .size-badge {
@@ -340,6 +380,8 @@ const handleFileChange = async (event) => {
   border: 1px solid #333;
   min-width: 32px;
   text-align: center;
+  white-space: nowrap; /* ← Thêm dòng này */
+  flex-shrink: 0;
 }
 
 /* Scrollbar tinh tế */
@@ -358,5 +400,42 @@ const handleFileChange = async (event) => {
 
 .toolbar::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.property-input-dark {
+  width: 50px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #eee;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+}
+
+.property-input-dark::-webkit-outer-spin-button,
+.property-input-dark::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.property-input-dark:focus {
+  border-color: #667eea;
+}
+
+.property-input-dark:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.property-value {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.property-value:hover {
+  background: #3a3a3a;
 }
 </style>

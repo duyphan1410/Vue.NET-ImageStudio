@@ -111,48 +111,20 @@
       </div>
 
       <div class="properties-content">
-        <div v-if="store.selectedId" class="property-group">
-          <div class="property-section">
-            <div class="section-header">Layer Settings</div>
-            
-            <div class="property-row">
-              <label class="property-label">Name</label>
-              <input 
-                type="text" 
-                class="property-input"
-                :value="selectedLayer?.name"
-                @input="e => updateLayerName(e.target.value)"
-                placeholder="Layer name"
-              />
-            </div>
-
-            <div class="property-row">
-              <label class="property-label">Opacity</label>
-              <div class="slider-control-mini">
-                 <input 
-                  type="range" 
-                  class="custom-range"
-                  min="0" max="100"
-                  value="100" 
-                  @input="console.log('Update opacity logic here')"
-                />
-                <span class="property-value">100%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="property-section">
-            <div class="section-header">Transform</div>
-            <div class="coming-soon">
-              <Wrench :size="32" class="coming-soon-icon" />
-              <p>Object properties coming soon</p>
-            </div>
-          </div>
+        <!-- Object Properties -->
+        <div v-if="activeObj" class="properties-wrapper">
+          <component 
+            v-for="(Comp, index) in propertyComponents"
+            :key="index"
+            :is="Comp"
+            :object="activeObj"
+          />
         </div>
 
+        <!-- Empty State -->
         <div v-else class="empty-state">
           <BoxSelect :size="48" class="empty-icon" stroke-width="1" />
-          <p>Select a layer to view properties</p>
+          <p>Select an object to view properties</p>
         </div>
       </div>
     </div>
@@ -160,8 +132,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { PropertyMapper } from '@/utils/ObjectClassifier';
 
 // 1. Import Lucide Icons
 import { 
@@ -206,6 +179,39 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
 });
+
+const activeObj = computed(() => store.selectedObject);
+
+const propertyComponents = computed(() => {
+  const obj = activeObj.value;
+
+  if (!obj) {
+    return [];
+  }
+
+  console.log('[PropertiesPanel] 🎯 Active object:', obj.type);
+
+  return PropertyMapper.getComponents(obj);
+});
+
+
+// Debug watch
+watch(activeObj, (newObj, oldObj) => {
+  // Bỏ qua if both null
+  if (!newObj && !oldObj) return;
+  
+  console.log('\n[PropertiesPanel.watch] Object changed:');
+  console.log('  Old:', oldObj?.type || 'null');
+  console.log('  New:', newObj?.type || 'null');
+  
+  if (newObj) {
+    console.log('  Details:', {
+      id: newObj.editorId,
+      left: Math.round(newObj.left || 0),
+      top: Math.round(newObj.top || 0),
+    });
+  }
+});
 </script>
 
 <style scoped>
@@ -219,12 +225,76 @@ onUnmounted(() => {
   height: 100%; /* Full height */
 }
 
+/* Panel Header */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  background: #2d2d2d;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e0e0;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+/* Properties Tab Styles */
+.properties-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
 /* Tabs */
 .panel-tabs {
   display: flex;
   background: #1e1e1e;
   border-bottom: 1px solid #1a1a1a;
   flex-shrink: 0;
+}
+
+
+.properties-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #555;
+}
+
+.empty-icon {
+  margin-bottom: 12px;
+  opacity: 0.5;
+  color: #667eea;
+}
+
+/* Scrollbar */
+.properties-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.properties-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.properties-content::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 2px;
+}
+
+.properties-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .tab-btn {
@@ -266,26 +336,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* Panel Header */
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #333;
-  background: #2d2d2d;
-  flex-shrink: 0;
-}
-
-.panel-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #e0e0e0;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
 }
 
 .action-btn {
@@ -453,12 +503,6 @@ onUnmounted(() => {
   margin: 4px 0;
 }
 
-/* Properties Tab Styles */
-.properties-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
 
 .property-group {
   display: flex;

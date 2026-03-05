@@ -21,11 +21,14 @@ export const ImageService = {
         });
 
         img.set({
+            editorId: crypto.randomUUID(),
+            objectType: 'image',
             left: canvas.width / 2,
             top: canvas.height / 2,
             originX: 'center',
             originY: 'center',
-            selectable: true
+            selectable: true,
+            evented: true,
         });
 
         const scale = Math.min(
@@ -34,6 +37,8 @@ export const ImageService = {
             1
         );
         img.scale(scale);
+
+        img.setCoords();
 
         return img;
     },

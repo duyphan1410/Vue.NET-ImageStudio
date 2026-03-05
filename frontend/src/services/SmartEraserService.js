@@ -1,5 +1,5 @@
 import { FabricImage, Group, Rect, Circle, Point, util, Path } from 'fabric'; // [FIX] Import util
-import { ObjectClassifier, ObjectType } from './ObjectClassifier';
+import { ObjectClassifier, ObjectType } from '../utils/ObjectClassifier';
 
 export const SmartEraserService = {
   /**
@@ -34,7 +34,6 @@ export const SmartEraserService = {
 
         const objType = ObjectClassifier.classify(obj);
 
-        // Logic xóa: Tạm thời ưu tiên Destructive để đảm bảo tính năng chạy được
         // Non-destructive trên v6 cần dùng ClipPath phức tạp hơn nhiều.
         if (objType === ObjectType.EDITABLE) {
           // Tạm thời convert sang destructive cho ổn định

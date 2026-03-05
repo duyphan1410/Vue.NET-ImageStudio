@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { markRaw } from 'vue';
+import { markRaw, nextTick } from 'vue';
 import { LayerService } from '@/services/LayerService';
 import { ToolService } from '@/services/ToolService';
 import { ImageService } from '@/services/ImageService';
@@ -22,6 +22,10 @@ export const useCanvasStore = defineStore('canvas', {
     historyStack: [],     // Ngăn xếp lưu lịch sử
     historyIndex: -1,     // Con trỏ vị trí hiện tại (-1 là chưa có gì)
     isUndoing: false,     // Cờ báo hiệu đang Undo/Redo để chặn Save đè
+    isLoadingFromJSON: false,
+    isEditingProperty: false,
+    selectedObject: null,
+    isLocked: false,
   }),
 
   getters: {
@@ -38,6 +42,68 @@ export const useCanvasStore = defineStore('canvas', {
       if (this.layers.length === 0) {
         this.addLayer('Layer 1');
       }
+    },
+
+    setSelectedObject(obj) {
+      if (!obj) {
+        this.selectedObject = null;
+        return;
+      }
+
+      // Đảm bảo object này có ID (phòng trường hợp object mới tạo chưa có)
+      if (!obj.get('editorId')) {
+        obj.set('editorId', crypto.randomUUID());
+        console.log(`[Selection] ID mới: ${obj.editorId}`);
+      }
+
+      // Gán tham chiếu để Vue/Bảng thuộc tính hoạt động
+      this.selectedObject = obj;
+
+      console.log(`[Selection] Đã chọn object: ${obj.editorId}`);
+    },
+
+    clearSelection() {
+      if (this.isUndoing) return;
+      this.selectedObject = null;
+    },
+
+    startHistory() {
+      this.isEditingProperty = true;
+    },
+
+    endHistory() {
+      this.isEditingProperty = false;
+      this.saveState(); // CHỈ LƯU 1 LẦN
+    },
+
+    syncLockState(obj) {
+      if (!obj) {
+        this.isLocked = false;
+        return;
+      }
+      this.isLocked = (
+        obj.lockMovementX &&
+        obj.lockMovementY &&
+        obj.lockScalingX &&
+        obj.lockScalingY &&
+        obj.lockRotation
+      );
+      console.log('[Store] Synced lock state:', this.isLocked);
+    },
+
+    applyLock(obj, locked) {
+      if (!obj) return;
+      obj.set({
+        lockMovementX: locked,
+        lockMovementY: locked,
+        lockScalingX: locked,
+        lockScalingY: locked,
+        lockRotation: locked,
+        hasControls: !locked,
+      });
+      obj.setCoords();
+      this.isLocked = locked;
+      console.log('[Store] Applied lock:', locked);
     },
 
     addLayer(name = 'New Layer', options = {}) {
@@ -70,6 +136,10 @@ export const useCanvasStore = defineStore('canvas', {
       const canvas = activeLayer.fabric;
 
       const img = await ImageService.createImageObject(file, canvas);
+
+      if (!img.editorId) {
+        img.editorId = crypto.randomUUID();  // Failsafe
+      }
 
       canvas.add(img);
       canvas.setActiveObject(img);
@@ -121,10 +191,10 @@ export const useCanvasStore = defineStore('canvas', {
     },
 
     async registerLayerCanvas(layerId, el) {
-      console.log('🧪 SmartEraserService check:', {
-        exists: !!SmartEraserService,
-        applyToLayers: typeof SmartEraserService?.applyToLayers
-      });
+      // console.log('🧪 SmartEraserService check:', {
+      //   exists: !!SmartEraserService,
+      //   applyToLayers: typeof SmartEraserService?.applyToLayers
+      // });
 
       const layer = this.layers.find(l => l.id === layerId);
       if (!layer) return;
@@ -132,7 +202,6 @@ export const useCanvasStore = defineStore('canvas', {
       // Nếu fabric đã có, chỉ cập nhật DOM ref
       if (layer.fabric) {
         if (layer.canvasEl !== el) {
-          console.log(`[Re-link] Update DOM ref for ${layerId}`);
           layer.canvasEl = el;
         }
 
@@ -141,14 +210,12 @@ export const useCanvasStore = defineStore('canvas', {
         // Sau khi Vue re-render, phải apply lại tool
         // Vì Fabric có thể bị reset state
         if (this.selectedId === layerId) {
-          console.log(`[Re-link] Re-applying tool to ${layerId}`);
           this.applyCurrentTool(layer.fabric);
         }
         return;
       }
 
       // Init Fabric Mới
-      console.log(`[Init] Creating NEW Fabric instance for ${layerId}`);
       const fabricCanvas = LayerService.initCanvas(el);
 
       if (!fabricCanvas) {
@@ -159,10 +226,30 @@ export const useCanvasStore = defineStore('canvas', {
       layer.fabric = markRaw(fabricCanvas);
       layer.canvasEl = el;
 
+      // ===== SELECTION EVENTS (CHO PROPERTY PANEL) =====
+      fabricCanvas.on('selection:created', (e) => {
+        const obj = e.selected?.[0] || null;
+        if (!obj) return;
+        this.applySelectionStyle(obj);
+        this.setSelectedObject(obj);
+      });
+
+      fabricCanvas.on('selection:updated', (e) => {
+        const obj = e.selected?.[0] || null;
+        if (!obj) return;
+
+        this.applySelectionStyle(obj);
+        this.setSelectedObject(obj);
+      });
+
+      fabricCanvas.on('selection:cleared', () => {
+        this.clearSelection();
+      });
+
+
       fabricCanvas.on('path:created', async (e) => {
         if (this.activeTool === 'eraser') {
           // 1. Lấy eraser path vừa vẽ
-          console.log('🔴 ERASER PATH CREATED');
           this.isUndoing = true;
           const eraserPath = e.path;
 
@@ -176,7 +263,7 @@ export const useCanvasStore = defineStore('canvas', {
           //   evented: false,
           //   erasable: false
           // });
-          
+
           // 2. Xóa path preview khỏi canvas hiện tại
           const eraserGeometry = eraserPath.toObject(['path', 'strokeWidth', 'left', 'top', 'width', 'height', 'pathOffset']);
 
@@ -186,7 +273,6 @@ export const useCanvasStore = defineStore('canvas', {
           // remove path khỏi canvas
           fabricCanvas.remove(eraserPath);
           fabricCanvas.requestRenderAll();
-          console.log('✅ ERASER PATH REMOVED');
 
           const activeLayer = this.layers.find(l => l.id === this.selectedId);
 
@@ -195,16 +281,7 @@ export const useCanvasStore = defineStore('canvas', {
             console.warn('⚠️ No active layer to erase');
             return;
           }
-
-          // 3. Apply eraser cho TẤT CẢ layers visible
           try {
-            // ✅ Apply SmartEraser với logic phân loại (CẦN await)
-            console.log('🔵 Starting SmartEraser.applyToLayers...');
-            console.log('   - eraserPath:', eraserGeometry);
-            console.log('   - layers count:', this.layers.length);
-
-            console.log('⏳ Eraser processing...');
-
             // Vì Service mới là Async, ta phải await để đảm bảo xóa xong hết mới chạy tiếp
             await SmartEraserService.applyToLayers(
               eraserGeometry,
@@ -214,29 +291,55 @@ export const useCanvasStore = defineStore('canvas', {
 
             this.isUndoing = false;
 
-            console.log('✅ Eraser done.');
             this.saveState();
           } catch (error) {
             console.error('❌ Eraser Failed:', error);
             this.isUndoing = false;
           }
           return; // Không save state ở đây
+        } else {
+          const path = e.path;
+
+          path.set({
+            editorId: crypto.randomUUID(),
+            objectType: 'path',
+            selectable: true,
+            evented: true,
+          });
+
+          const center = path.getCenterPoint();
+
+          // console.log('Vị trí pathOffset:', {
+          //   left: path.pathOffset.x,
+          //   top: path.pathOffset.y
+          // });
+
+          path.set({
+            originX: 'center',
+            originY: 'center',
+            left: center.x,
+            top: center.y
+          });
+
+          path.setCoords();
+
+          fabricCanvas.requestRenderAll();
         }
 
         this.triggerUpdateThumbnail(layerId);
         this.saveState();
       });
 
-      // fabricCanvas.on('mouse:up', () => {
-      //   if (this.activeTool !== 'eraser') return;
-
+      // fabricCanvas.on('object:added', () => {
+      //   if (this.activeTool === 'eraser') return;
+      //   if (this.isEditingProperty) return;
       //   this.triggerUpdateThumbnail(layerId);
       //   this.saveState();
       // });
 
-
       fabricCanvas.on('object:modified', () => {
         if (this.activeTool === 'eraser') return;
+        if (this.isEditingProperty) return;
         this.triggerUpdateThumbnail(layerId);
         this.saveState()
       });
@@ -246,11 +349,6 @@ export const useCanvasStore = defineStore('canvas', {
         this.saveState()
       });
 
-      // fabricCanvas.on('object:added', () => {
-      //   // Tương tự, eraser add object mới -> ko save ở đây
-      //   if (this.activeTool === 'eraser') return;
-      // });
-
       // Cập nhật quyền tương tác
       this.updateLayerInteractions();
 
@@ -258,8 +356,11 @@ export const useCanvasStore = defineStore('canvas', {
       const dataToLoad = layer.clonedData || layer.pendingData;
 
       if (dataToLoad) {
-        console.log(`[Duplicate] Loading data for ${layerId}`);
-        LayerService.loadFromJSON(fabricCanvas, dataToLoad).then(() => {
+        // console.log(`[Duplicate] Loading data for ${layerId}`);
+        LayerService.loadFromJSON(fabricCanvas, dataToLoad,
+          () => { this.isLoadingFromJSON = true; },
+          () => { this.isLoadingFromJSON = false; }
+        ).then(() => {
           delete layer.clonedData;
           delete layer.pendingData;
           this.triggerUpdateThumbnail(layerId);
@@ -271,15 +372,15 @@ export const useCanvasStore = defineStore('canvas', {
 
       // Nếu đây là layer đang chọn, apply tool ngay
       if (this.selectedId === layerId) {
-        console.log(`[Init] ${layerId} is selected, applying tool "${this.activeTool}"`);
+        // console.log(`[Init] ${layerId} is selected, applying tool "${this.activeTool}"`);
         this.applyCurrentTool(fabricCanvas);
       } else {
-        console.log(`[Init] ${layerId} is NOT selected, disabling it`);
+        // console.log(`[Init] ${layerId} is NOT selected, disabling it`);
       }
     },
 
     updateLayerInteractions() {
-      console.log(`[Interactions] Updating for selectedId: ${this.selectedId}`);
+      // console.log(`[Interactions] Updating for selectedId: ${this.selectedId}`);
 
       this.layers.forEach(layer => {
         if (!layer.fabric) return;
@@ -315,15 +416,15 @@ export const useCanvasStore = defineStore('canvas', {
             obj.evented = false;
           });
 
-          layer.fabric.discardActiveObject();
-          layer.fabric.requestRenderAll();
+          // layer.fabric.discardActiveObject();
+          // layer.fabric.requestRenderAll();
         }
       });
     },
 
     // --- Tools ---
     setTool(toolId) {
-      console.log(`[Tool] Switching to: ${toolId}`);
+      // console.log(`[Tool] Switching to: ${toolId}`);
       this.activeTool = toolId;
     },
 
@@ -334,7 +435,7 @@ export const useCanvasStore = defineStore('canvas', {
         return;
       }
 
-      console.log(`[Tool] Applying "${this.activeTool}" to canvas`);
+      // console.log(`[Tool] Applying "${this.activeTool}" to canvas`);
 
       // Reset ALL tools
       ToolService.resetAllTools(canvas);
@@ -359,16 +460,16 @@ export const useCanvasStore = defineStore('canvas', {
       } else if (['rectangle', 'circle'].includes(this.activeTool)) {
         ToolService.setupShapeListeners(canvas, this.activeTool, this.brushColor, this.brushSize);
         canvas.selection = false;
-        canvas.forEachObject(obj => {
-          obj.selectable = false;
-          obj.evented = false;
-        });
+        // canvas.forEachObject(obj => {
+        //   obj.selectable = false;
+        //   obj.evented = false;
+        // });
       } else if (this.activeTool === 'select') {
         ToolService.clearShapeListeners(canvas);
         canvas.isDrawingMode = false;
         canvas.selection = true;
         canvas.skipTargetFind = false;
-        canvas.defaultCursor = 'default';
+        // canvas.defaultCursor = 'default';
 
         canvas.forEachObject(obj => {
           obj.selectable = true;
@@ -376,8 +477,20 @@ export const useCanvasStore = defineStore('canvas', {
         });
       }
       canvas.requestRenderAll();
-      console.log(`[Tool] Applied! isDrawingMode=${canvas.isDrawingMode}, selection=${canvas.selection}`);
+      // console.log(`[Tool] Applied! isDrawingMode=${canvas.isDrawingMode}, selection=${canvas.selection}`);
+    },
 
+    applySelectionStyle(obj) {
+      if (!obj) return;
+
+      obj.set({
+        borderColor: '#667eea',
+        cornerColor: '#667eea',
+        cornerSize: 8,
+        cornerStyle: 'circle',
+        transparentCorners: false,
+        cornerStrokeColor: '#fff'
+      });
     },
 
     triggerUpdateThumbnail(layerId) {
@@ -419,10 +532,95 @@ export const useCanvasStore = defineStore('canvas', {
       }
     },
 
-    updateBrushSettings(size, color) {
-      this.brushSize = size;
-      this.brushColor = color;
+    // updateBrushSettings(size, color) {
+    //   this.brushSize = size;
+    //   this.brushColor = color;
+
+    //   const canvas = this.activeFabric;
+    //   if (!canvas) return;
+
+    //   if (canvas.freeDrawingBrush) {
+    //     canvas.freeDrawingBrush.width = size;
+    //     if (this.activeTool === 'brush') {
+    //       canvas.freeDrawingBrush.color = color;
+    //     }
+    //   }
+
+    //   // 2. Chỉ cập nhật Cursor nếu đang ở chế độ vẽ
+    //   if (canvas.isDrawingMode) {
+    //     // Dùng kỹ thuật kiểm tra đơn giản để tránh render SVG quá dày đặc
+    //     // Nếu bạn đang dùng Fabric 6, hãy dùng freeDrawingCursor
+    //     const newCursor = (this.activeTool === 'brush')
+    //       ? ToolService._createBrushCursor(size, color)
+    //       : ToolService._createEraserCursor(size);
+
+    //     canvas.freeDrawingCursor = newCursor;
+    //     canvas.defaultCursor = newCursor;
+    //   }
+
+    //   this.applyCurrentTool();
+    // },
+
+    previewBrushColor(color) {
+      const canvas = this.activeFabric;
+      if (!canvas || !canvas.freeDrawingBrush) return;
+
+      // Chỉ preview màu
+      if (this.activeTool === 'brush') {
+        canvas.freeDrawingBrush.color = color;
+      }
+    },
+
+    commitBrushColor(color) {
+      const canvas = this.activeFabric;
+      if (!canvas) return;
+
+      this.brushColor = color; // Lưu vào state của Pinia
+
+      if (canvas.freeDrawingBrush && this.activeTool === 'brush') {
+        canvas.freeDrawingBrush.color = color;
+      }
+
+      // Cập nhật Cursor một lần duy nhất khi chốt màu
+      if (canvas.isDrawingMode) {
+        const newCursor = (this.activeTool === 'brush')
+          ? ToolService._createBrushCursor(this.brushSize, color)
+          : ToolService._createEraserCursor(this.brushSize);
+
+        canvas.freeDrawingCursor = newCursor;
+        canvas.defaultCursor = newCursor;
+      }
+
       this.applyCurrentTool();
+    },
+
+    previewBrushSize(size) {
+      const canvas = this.activeFabric;
+      if (!canvas || !canvas.freeDrawingBrush) return;
+
+      // Cập nhật giá trị hiển thị trên UI ngay lập tức
+      this.brushSize = size;
+
+      // Cập nhật độ dày nét vẽ thực tế
+      canvas.freeDrawingBrush.width = size;
+    },
+
+    // 2. Vẽ lại Cursor sau khi người dùng thả thanh trượt ra
+    commitBrushSize(size) {
+      const canvas = this.activeFabric;
+      if (!canvas) return;
+
+      this.brushSize = size;
+
+      if (canvas.isDrawingMode) {
+        // Vẽ lại con trỏ SVG mới với kích thước vừa chốt
+        const newCursor = (this.activeTool === 'brush')
+          ? ToolService._createBrushCursor(size, this.brushColor)
+          : ToolService._createEraserCursor(size);
+
+        canvas.freeDrawingCursor = newCursor;
+        canvas.defaultCursor = newCursor;
+      }
     },
 
     reorderLayer(id, direction) {
@@ -553,7 +751,14 @@ export const useCanvasStore = defineStore('canvas', {
 
     saveState() {
       // Nếu đang trong quá trình Undo/Redo thì KHÔNG lưu đè
-      if (this.isUndoing) return;
+      if (this.isUndoing || this.isEditingProperty) return;
+
+      console.log('[History.saveState] Called', {
+        activeTool: this.activeTool,
+        selectedObject: this.selectedObject?.editorId || 'null',
+        historyIndex: this.historyIndex,
+        stackLength: this.historyStack.length
+      });
 
       // Nếu đang đứng ở quá khứ mà vẽ nét mới -> Xóa tương lai đi
       // Ví dụ: A -> B -> C. Undo về B. Vẽ nét D. Kết quả: A -> B -> D (C bị xóa)
@@ -561,8 +766,14 @@ export const useCanvasStore = defineStore('canvas', {
         this.historyStack = this.historyStack.slice(0, this.historyIndex + 1);
       }
 
+      if (this.selectedObject && !this.selectedObject.editorId) {
+        this.selectedObject.editorId = `obj_${crypto.randomUUID()}`;
+        console.warn('[History] ⚠️ Assigned missing editorId to selectedObject:', this.selectedObject.editorId);
+      }
+
       // Tạo Snapshot
-      const snapshot = LayerService.exportProjectState(this.layers, this.selectedId);
+      const snapshot = LayerService.exportProjectState(this.layers, this.selectedId, this.selectedObject);
+      console.log('[History] Snapshot created, selectedObject editorId:', snapshot.selectedObject?.editorId);
 
       // Đẩy vào stack
       this.historyStack.push(snapshot);
@@ -571,7 +782,9 @@ export const useCanvasStore = defineStore('canvas', {
       // Giới hạn 20 bước (để tiết kiệm RAM)
       if (this.historyStack.length > 20) {
         this.historyStack.shift();
-        this.historyIndex--;
+        if (this.historyIndex > 0) {
+          this.historyIndex--;
+        }
       }
 
       console.log(`[History] Saved. Steps: ${this.historyIndex + 1}/${this.historyStack.length}`);
@@ -582,6 +795,13 @@ export const useCanvasStore = defineStore('canvas', {
 
       this.isUndoing = true; // Bật cờ
       this.historyIndex--;   // Lùi con trỏ
+
+      console.log('[History.undo]', {
+        historyIndex: this.historyIndex,
+        stackLength: this.historyStack.length,
+        snapshot: this.historyStack[this.historyIndex]  // ← In snapshot
+      });
+
       await this.loadState(this.historyStack[this.historyIndex]);
       this.isUndoing = false; // Tắt cờ
     },
@@ -598,31 +818,80 @@ export const useCanvasStore = defineStore('canvas', {
     async loadState(snapshot) {
       if (!snapshot) return;
 
-      console.log('[History] Loading snapshot...');
+      // Bật cờ để các listener (như selection:cleared) không vô tình reset store
+      this.isUndoing = true;
 
-      // Bước 1: Dọn dẹp layer cũ (Tránh leak memory)
-      this.layers.forEach(l => {
-        if (l.fabric) LayerService.disposeCanvas(l.fabric);
-      });
+      try {
+        // BƯỚC 1: Dọn dẹp layer cũ (Chỉ dọn dẹp canvas, KHÔNG reset selectedObject ở đây)
+        this.layers.forEach(l => {
+          if (l.fabric) LayerService.disposeCanvas(l.fabric);
+        });
 
-      // Bước 2: Gán dữ liệu mới vào State
-      // Vue sẽ tự động render lại <canvas> nhờ v-for
-      this.layers = snapshot.layers.map(item => ({
-        id: item.id,
-        name: item.name,
-        visible: item.visible,
-        canvasEl: null, // Sẽ được bind lại
-        fabric: null,   // Sẽ được init lại
-        pendingData: item.canvasData // Dữ liệu chờ nạp (Quan trọng)
-      }));
+        // BƯỚC 2: Gán dữ liệu khung cho Vue render DOM
+        this.layers = snapshot.layers.map(item => ({
+          id: item.id,
+          name: item.name,
+          visible: item.visible,
+          canvasEl: null,
+          fabric: null,
+          pendingData: item.canvasData
+        }));
 
-      // Bước 3: Khôi phục selection (Mặc định chọn layer trên cùng)
-      if (this.layers.length > 0) {
-        this.selectedId = snapshot.selectedId || (
-          this.layers.length ? this.layers[this.layers.length - 1].id : null
-        );
-      } else {
-        this.selectedId = null;
+        // Đợi Vue cập nhật lại các thẻ <canvas> vào DOM
+        await nextTick();
+
+        // BƯỚC 3: Khởi tạo lại Fabric và nạp JSON
+        const initPromises = this.layers.map(async (layer) => {
+          const el = document.getElementById(`canvas-${layer.id}`);
+          if (el) {
+            layer.fabric = LayerService.initCanvas(el, {
+              onSelect: (obj) => this.setSelectedObject(obj),
+              onClear: () => this.clearSelection(),
+            });
+            // Đợi nạp xong JSON cho từng layer
+            await LayerService.loadFromJSON(layer.fabric, layer.pendingData);
+          }
+        });
+
+        await Promise.all(initPromises);
+
+        // Đợi thêm 1 tick để Fabric ổn định các đối tượng trong RAM
+        await nextTick();
+
+        await new Promise(r => setTimeout(r, 10));
+
+        // BƯỚC 4: Khôi phục Selection
+        this.selectedId = snapshot.selectedId;
+        const targetId = snapshot.selectedObject?.editorId;
+
+        if (targetId) {
+          const activeLayer = this.layers.find(l => l.id === this.selectedId);
+          const canvas = activeLayer?.fabric;
+
+          if (canvas) {
+            // Tìm đối tượng "sống" vừa được tạo ra từ JSON
+            const restoredObj = canvas.getObjects().find(o => o.editorId === targetId);
+
+            if (restoredObj) {
+              restoredObj.set({ selectable: true, evented: true });
+              canvas.setActiveObject(restoredObj);
+              // Gán lại tham chiếu mới cho Store (Bảng thuộc tính sẽ nhận diện tại đây)
+              this.selectedObject = restoredObj;
+              restoredObj.setCoords();
+              canvas.requestRenderAll();
+
+              return; // Kết thúc thành công
+            }
+          }
+        }
+
+        // Nếu chạy xuống đến đây (không return ở trên) nghĩa là:
+        // Snapshot này không có object nào được chọn HOẶC không tìm thấy object đó
+        this.selectedObject = null;
+
+      } finally {
+        // Tắt cờ sau khi mọi thứ đã xong
+        this.isUndoing = false;
       }
     },
 
