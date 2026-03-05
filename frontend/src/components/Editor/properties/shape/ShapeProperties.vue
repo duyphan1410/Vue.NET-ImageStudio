@@ -314,13 +314,6 @@ const updateCornerRadius = (val) => {
   cursor: not-allowed;
 }
 
-.property-value {
-  font-size: 12px;
-  color: #aaa;
-  width: 40px;
-  text-align: right;
-  font-family: monospace;
-}
 
 .color-picker-row {
   display: flex;
@@ -389,6 +382,15 @@ const updateCornerRadius = (val) => {
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.2s;
+  font-size: 12px;
+  color: #aaa;
+  width: 40px;
+  text-align: right;
+  font-family: monospace;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 27px;
 }
 
 .property-value:hover {

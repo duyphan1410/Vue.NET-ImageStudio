@@ -3,7 +3,7 @@ import { ref, computed, watch,onMounted, onBeforeUnmount } from 'vue';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { Lock, LockOpen } from 'lucide-vue-next';
 import { Link, Link2Off } from 'lucide-vue-next';
-
+import { FlipHorizontal2, FlipVertical2 } from 'lucide-vue-next';
 
 const store = useCanvasStore();
 const activeObj = computed(() => store.selectedObject);
@@ -22,6 +22,8 @@ const width = ref(0);
 const height = ref(0);
 const rotation = ref(0);
 // const isLocked = ref(false);
+const flipX = ref(false);
+const flipY = ref(false);
 const lockRatio = ref(false);
 const originalRatio = ref(1);
 
@@ -98,6 +100,9 @@ const syncFromObject = (obj, { final = false } = {}) => {
   posX.value = Math.round(obj.left);
   posY.value = Math.round(obj.top);
 
+  flipX.value = obj.flipX || false;
+  flipY.value = obj.flipY || false;
+
   if (final) {
     const w = obj.getScaledWidth();
     const h = obj.getScaledHeight();
@@ -137,6 +142,8 @@ watch(activeObj, (newObj, oldObj) => {
     rotation.value = 0;
     isLocked.value = false;
     lockRatio.value = false;
+    flipX.value = activeObj.value.flipX || false
+    flipY.value = activeObj.value.flipY || false
     return;
   }
 
@@ -224,6 +231,20 @@ const toggleLockRatio = () => {
 
   obj.setCoords();
   store.activeFabric.requestRenderAll();
+};
+
+const toggleFlip = (axis) => {
+  if (!activeObj.value) return;
+  if (axis === 'x') {
+    flipX.value = !flipX.value;
+    activeObj.value.set({ flipX: flipX.value });
+  } else {
+    flipY.value = !flipY.value;
+    activeObj.value.set({ flipY: flipY.value });
+  }
+  console.log('[ImageProperties] Flip', axis, ':', axis === 'x' ? flipX.value : flipY.value);
+  activeObj.value.setCoords();
+  update();
 };
 
 const updateSize = (val, axis) => {
@@ -316,20 +337,21 @@ const update = () => {
 
 <template>
   <div class="property-section">
-    <div class="section-header">Position & Size</div>
+    <div class="section-header-row">
+      <div class="section-header">Position & Size</div>
+      <button :class="['header-lock-btn', { locked: isLocked }]" @click="toggleLock">
+        <component :is="isLocked ? Lock : LockOpen" :size="14" />
+      </button>
+    </div>
 
-    <!-- Position: X - Y -->
     <div class="pos-grid mt-12">
       <div class="input-col">
         <label class="mini-label">X</label>
         <div class="input-with-unit">
           <input 
-            type="number" 
-            class="property-input-dark"
-            :value="posX"
-            :disabled="isLocked"
+            type="number" class="property-input-dark no-spin" :value="posX" :disabled="isLocked"
             @input="e => updatePos(Number(e.target.value), 'x')"
-            @blur="e => commitFill(e.target.value)"
+            @blur="e => commitFill(e.target.value)" 
           />
           <span class="unit-label">px</span>
         </div>
@@ -338,10 +360,7 @@ const update = () => {
         <label class="mini-label">Y</label>
         <div class="input-with-unit">
           <input 
-            type="number" 
-            class="property-input-dark"
-            :value="posY"
-            :disabled="isLocked"
+            type="number" class="property-input-dark no-spin" :value="posY" :disabled="isLocked"
             @input="e => updatePos(Number(e.target.value), 'y')"
             @blur="e => commitFill(e.target.value)"
           />
@@ -350,43 +369,26 @@ const update = () => {
       </div>
     </div>
 
-    <!-- Size: W - Lock Button - H -->
     <div class="size-grid mt-12">
       <div class="input-col">
         <label class="mini-label">W</label>
         <div class="input-with-unit">
           <input 
-            type="number" 
-            class="property-input-dark"
-            :value="width"
-            :disabled="isLocked"
+            type="number" class="property-input-dark no-spin" :value="width" :disabled="isLocked"
             @input="e => updateSize(Number(e.target.value), 'w')"
             @blur="e => commitFill(e.target.value)"
           />
           <span class="unit-label">px</span>
         </div>
       </div>
-
-      <button
-        class="lock-ratio-btn"
-        :class="{ active: lockRatio }"
-        @click="toggleLockRatio"
-        title="Lock aspect ratio"
-      >
-        <component
-          :is="lockRatio ? Link : Link2Off"
-          :size="18"
-        />
+      <button class="lock-ratio-btn" :class="{ active: lockRatio }" @click="toggleLockRatio">
+        <component :is="lockRatio ? Link : Link2Off" :size="16" />
       </button>
-
       <div class="input-col">
         <label class="mini-label">H</label>
         <div class="input-with-unit">
           <input 
-            type="number" 
-            class="property-input-dark"
-            :value="height"
-            :disabled="isLocked"
+            type="number" class="property-input-dark no-spin" :value="height" :disabled="isLocked"
             @input="e => updateSize(Number(e.target.value), 'h')"
             @blur="e => commitFill(e.target.value)"
           />
@@ -395,51 +397,36 @@ const update = () => {
       </div>
     </div>
 
-    <!-- Rotation -->
-    <div class="property-row mt-12">
-      <label class="property-label">Rotation</label>
-      <div class="slider-control">
+    <div class="divider mt-12"></div>
+
+    <div class="transform-area mt-12">
+      <div class="transform-header">
+        <label class="mini-label">Rotation & Flip</label>
+        <div class="flip-group">
+          <button :class="['flip-mini-btn', { active: flipX }]" :disabled="isLocked" @click="() => { toggleFlip('x'); commitFill() }">
+            <FlipHorizontal2 :size="14" />
+          </button>
+          <button :class="['flip-mini-btn', { active: flipY }]" :disabled="isLocked" @click="() => { toggleFlip('y'); commitFill() }">
+            <FlipVertical2 :size="14" />
+          </button>
+        </div>
+      </div>
+      
+      <div class="rotation-control-row mt-12">
         <input 
-          type="range" 
-          class="custom-range"
-          :value="rotation"
-          :disabled="isLocked"
-          min="-180" max="180"
+          type="range" class="custom-range" :value="rotation" min="-180" max="180" :disabled="isLocked"
           @input="e => updateRotation(e.target.value)"
-          @change="e => commitFill(e.target.value)"
+          @change="e => commitFill(e.target.value)" 
         />
-        <span 
-          v-if="!showValueInput"
-          class="property-value"
-          @click="toggleValueInput"
-        >{{ rotation }}°</span>
+        <span v-if="!showValueInput" class="property-value" @click="toggleValueInput">{{ rotation }}°</span>
         <input 
-          v-else
-          type="number"
-          v-model.number="rotation"
-          :disabled="isLocked"
-          min="-180" max="180"
-          class="property-input-dark"
+          v-else type="number" v-model.number="rotation" class="property-input-dark no-spin small-input" :disabled="isLocked"
           @input="e => updateRotation(e.target.value)"
-          @change="e => {
-            commitFill(e.target.value);
-            showValueInput = false;
-          }"
+          @change="e => { commitFill(e.target.value); showValueInput = false; }"
           @blur="showValueInput = false"
           v-autofocus
-        />
+          />
       </div>
-    </div>
-
-    <!-- Lock -->
-    <div class="property-row mt-12">
-      <button 
-        :class="['lock-btn', { locked: isLocked }]"
-        @click="toggleLock"
-      >
-        <component :is="isLocked ? Lock : LockOpen" :size="16" stroke-width="1.5" />
-        <span>{{ isLocked ? 'Locked' : 'Unlocked' }}</span>
-      </button>
     </div>
   </div>
 </template>
@@ -452,137 +439,35 @@ const update = () => {
   padding: 12px;
 }
 
-.section-header {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #667eea;
-  margin-bottom: 12px;
-}
-
-.property-label {
-  display: block;
-  font-size: 12px;
-  color: #888;
-  margin-bottom: 6px;
-}
-
-/* ✅ Position Grid: X - Y (2 cột bằng nhau) */
-.pos-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-/* ✅ Size Grid: W - Button - H (cân đối) */
-.size-grid {
-  display: grid;
-  grid-template-columns: 1fr 40px 1fr;
-  gap: 8px;
-  align-items: flex-end;
-}
-
-.input-col {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mini-label {
-  font-size: 10px;
-  color: #888;
-  font-weight: 600;
-  margin-bottom: 0;
-  display: block;
-}
-
-.input-with-unit {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.property-input-dark {
-  width: 100%;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  color: #eee;
-  padding: 6px 24px 6px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  outline: none;
-}
-
-.property-input-dark:focus {
-  border-color: #667eea;
-}
-
-.property-input-dark:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.unit-label {
-  position: absolute;
-  right: 8px;
-  font-size: 10px;
-  color: #444;
-  pointer-events: none;
-}
-
-.mt-12 { margin-top: 12px; }
-
-/* ẩn mũi tên của input number */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
+/* ẨN MŨI TÊN TRÌNH DUYỆT */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+.no-spin { -moz-appearance: textfield; }
 
-.property-row {
-  margin-bottom: 0;
+/* HEADER & DIVIDER */
+.section-header-row { display: flex; justify-content: space-between; align-items: center; }
+.section-header { font-size: 11px; font-weight: 700; color: #667eea; text-transform: uppercase; }
+.header-lock-btn { background: transparent; border: none; color: #555; cursor: pointer; padding: 4px; }
+.header-lock-btn.locked { color: #f87171; }
+.divider { height: 1px; background: #3a3a3a; margin: 12px -12px; }
+
+/* GRIDS */
+.pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.size-grid { display: grid; grid-template-columns: 1fr 32px 1fr; gap: 8px; align-items: flex-end; }
+.mini-label { font-size: 10px; color: #888; font-weight: 600; margin-bottom: 4px; display: block; }
+
+.property-input-dark {
+  width: 100%; background: #1a1a1a; border: 1px solid #333; color: #eee;
+  padding: 6px 8px; border-radius: 4px; font-size: 12px; outline: none; height: 27px;
 }
 
-/* ✅ Lock Ratio Button - căn giữa với các input */
-.lock-ratio-btn {
-  width: 40px;
-  height: 32px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  color: #666;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
+.input-with-unit { position: relative; }
+.unit-label { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #444; pointer-events: none; }
 
-.lock-ratio-btn:hover {
-  background: #353535;
-  color: #e0e0e0;
-  border-color: #4a4a4a;
-}
-
-.lock-ratio-btn.active {
-  background: #5c7cfa;
-  border-color: #5c7cfa;
-  color: #fff;
-  box-shadow: 0 0 8px rgba(92, 124, 250, 0.3);
-}
-
-.slider-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.slider-control input[type="number"] {
-  width: 55px;  /* ← Input number fix width */
-  flex-shrink: 0;
-}
-
+.rotation-control-row { display: flex; align-items: center; gap: 10px; }
 .custom-range {
   -webkit-appearance: none;
   flex: 1;
@@ -624,47 +509,43 @@ input::-webkit-inner-spin-button {
   cursor: not-allowed;
 }
 
+
 .property-value {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
   font-size: 12px;
   color: #aaa;
   width: 40px;
   text-align: right;
   font-family: monospace;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 27px;
 }
-
 .property-value:hover {
   background: #3a3a3a;
 }
 
-.lock-btn {
-  width: 100%;
-  padding: 8px 12px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  color: #aaa;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s;
+.small-input {
+  width: 40px;
+  padding: 4px 6px;
+  text-align: center;
+  line-height: 1;
+  height: 27px;
 }
 
-.lock-btn:hover {
-  background: #353535;
-  color: #e0e0e0;
+.transform-header { display: flex; justify-content: space-between; align-items: center; }
+.flip-group { display: flex; gap: 2px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 2px; }
+.flip-mini-btn {
+  width: 28px; height: 22px; background: transparent; border: none;
+  border-radius: 3px; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
+.flip-mini-btn.active { background: #667eea; color: white; }
 
-.lock-btn.locked {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
+.lock-ratio-btn { background: transparent; border: none; color: #555; cursor: pointer; padding-bottom: 6px; }
+.lock-ratio-btn.active { color: #667eea; }
+.mt-12 { margin-top: 12px; }
 </style>

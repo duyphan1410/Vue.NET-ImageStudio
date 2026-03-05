@@ -117,7 +117,7 @@ const commitOpacity = () => {
 }
 
 .slider-control input[type="number"] {
-  width: 55px;  /* ← Input number fix width */
+  width: 40px;  /* ← Input number fix width */
   flex-shrink: 0;
 }
 
@@ -172,6 +172,7 @@ const commitOpacity = () => {
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.2s;
+  height: 27px;
 }
 
 .property-value:hover {
@@ -179,7 +180,7 @@ const commitOpacity = () => {
 }
 
 .property-input-dark {
-  width: 100%;
+  width: 40px;
   background: #1a1a1a;
   border: 1px solid #333;
   color: #eee;
@@ -187,6 +188,7 @@ const commitOpacity = () => {
   border-radius: 4px;
   font-size: 12px;
   outline: none;
+  height: 27px;
 }
 
 .property-input-dark::-webkit-outer-spin-button,
